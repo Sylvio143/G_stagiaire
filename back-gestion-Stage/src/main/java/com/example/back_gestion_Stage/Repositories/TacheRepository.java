@@ -12,7 +12,6 @@ import java.util.Optional;
 @Repository
 public interface TacheRepository extends JpaRepository<Tache, Long> {
     Optional<Tache> findByDocumentId(String documentId);
-    List<Tache> findByStageDocumentId(String stageDocumentId);
     List<Tache> findByStatut(Tache.StatutTache statut);
     List<Tache> findByDateFinBeforeAndStatutNot(LocalDateTime date, Tache.StatutTache statut);
     
