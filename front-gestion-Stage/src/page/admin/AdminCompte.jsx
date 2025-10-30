@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Users, 
   Search, 
-  Filter,
   Edit2,
   Eye,
   Mail,
@@ -18,7 +17,8 @@ import {
   Lock,
   Unlock,
   CheckCircle,
-  XCircle
+  XCircle,
+  Trash2
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -50,6 +50,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -73,176 +75,51 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration
-const comptesData = [
-  {
-    id: 1,
-    nom: "Dubois",
-    prenom: "Michel",
-    email: "michel.dubois@entreprise.com",
-    telephone: "+33 6 11 22 33 44",
-    role: "Superieur",
-    dateCreation: "2023-03-15",
-    dateDerniereConnexion: "2024-12-10",
-    statut: "Actif",
-    actif: true,
-    departement: "Développement Web",
-    ville: "Paris",
-    dernierAcces: "Il y a 2 heures",
-    permissions: ["Gestion équipe", "Validation rapports", "Supervision"]
-  },
-  {
-    id: 2,
-    nom: "Martin",
-    prenom: "Sophie",
-    email: "sophie.martin@entreprise.com",
-    telephone: "+33 6 22 33 44 55",
-    role: "Superieur",
-    dateCreation: "2023-06-10",
-    dateDerniereConnexion: "2024-12-09",
-    statut: "Actif",
-    actif: true,
-    departement: "Design UX/UI",
-    ville: "Lyon",
-    dernierAcces: "Il y a 5 heures",
-    permissions: ["Gestion équipe", "Validation rapports"]
-  },
-  {
-    id: 3,
-    nom: "Leroy",
-    prenom: "Thomas",
-    email: "thomas.leroy@entreprise.com",
-    telephone: "+33 6 55 66 77 88",
-    role: "Encadreur",
-    dateCreation: "2023-09-05",
-    dateDerniereConnexion: "2024-12-10",
-    statut: "Actif",
-    actif: true,
-    departement: "Cybersécurité",
-    ville: "Lille",
-    dernierAcces: "Il y a 30 minutes",
-    permissions: ["Encadrement stagiaires", "Évaluation", "Rapports"]
-  },
-  {
-    id: 4,
-    nom: "Garcia",
-    prenom: "Lucas",
-    email: "lucas.garcia@entreprise.com",
-    telephone: "+33 6 66 77 88 99",
-    role: "Encadreur",
-    dateCreation: "2023-11-12",
-    dateDerniereConnexion: "2024-12-09",
-    statut: "Actif",
-    actif: true,
-    departement: "Mobile Development",
-    ville: "Nantes",
-    dernierAcces: "Il y a 1 heure",
-    permissions: ["Encadrement stagiaires", "Évaluation"]
-  },
-  {
-    id: 5,
-    nom: "Dupont",
-    prenom: "Jean",
-    email: "jean.dupont@email.com",
-    telephone: "+33 6 12 34 56 78",
-    role: "Stagiaire",
-    dateCreation: "2024-08-01",
-    dateDerniereConnexion: "2024-12-10",
-    statut: "Actif",
-    actif: true,
-    formation: "Développement Web Fullstack",
-    entreprise: "TechCorp Solutions",
-    ville: "Paris",
-    dernierAcces: "Il y a 15 minutes",
-    permissions: ["Consultation", "Soumission rapports"]
-  },
-  {
-    id: 6,
-    nom: "Bernard",
-    prenom: "Pierre",
-    email: "pierre.bernard@email.com",
-    telephone: "+33 6 34 56 78 90",
-    role: "Stagiaire",
-    dateCreation: "2024-07-20",
-    dateDerniereConnexion: "2024-11-28",
-    statut: "Inactif",
-    actif: false,
-    formation: "Data Science & Machine Learning",
-    entreprise: "DataInnov Analytics",
-    ville: "Marseille",
-    dernierAcces: "Il y a 2 semaines",
-    permissions: ["Consultation", "Soumission rapports"]
-  },
-  {
-    id: 7,
-    nom: "Moreau",
-    prenom: "Alice",
-    email: "alice.moreau@entreprise.com",
-    telephone: "+33 6 44 55 66 77",
-    role: "Superieur",
-    dateCreation: "2023-02-28",
-    dateDerniereConnexion: "2024-12-08",
-    statut: "Suspendu",
-    actif: false,
-    departement: "Marketing Digital",
-    ville: "Toulouse",
-    dernierAcces: "Il y a 3 jours",
-    permissions: ["Gestion équipe", "Validation rapports"]
-  },
-  {
-    id: 8,
-    nom: "Roux",
-    prenom: "Emma",
-    email: "emma.roux@entreprise.com",
-    telephone: "+33 6 77 88 99 00",
-    role: "Encadreur",
-    dateCreation: "2023-03-20",
-    dateDerniereConnexion: "2024-12-10",
-    statut: "Actif",
-    actif: true,
-    departement: "Data Science",
-    ville: "Marseille",
-    dernierAcces: "Il y a 45 minutes",
-    permissions: ["Encadrement stagiaires", "Évaluation", "Rapports"]
-  }
-];
-
 export default function AdminCompte() {
-  const [comptes, setComptes] = useState(comptesData);
+  const [comptes, setComptes] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filtreRole, setFiltreRole] = useState("tous");
   const [filtreStatut, setFiltreStatut] = useState("tous");
-  const [filtreActif, setFiltreActif] = useState("tous");
   const [recherche, setRecherche] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
   const [selectedCompte, setSelectedCompte] = useState(null);
   const [formData, setFormData] = useState({
-    nom: "",
-    prenom: "",
     email: "",
-    telephone: "",
-    role: "",
-    statut: "Actif",
-    actif: true,
-    departement: "",
-    formation: "",
-    entreprise: "",
-    ville: ""
+    typeCompte: "",
+    statut: "ACTIF",
+    entityDocumentId: "",
+    entityType: ""
   });
+
+  // Configuration Axios
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les comptes depuis l'API
+  const fetchComptes = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE_URL}/comptes-utilisateurs/tous`);
+      setComptes(response.data);
+    } catch (error) {
+      console.error("Erreur lors du chargement des comptes:", error);
+      toast.error("Erreur lors du chargement des comptes");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchComptes();
+  }, []);
 
   // Réinitialiser le formulaire
   const resetForm = () => {
     setFormData({
-      nom: "",
-      prenom: "",
       email: "",
-      telephone: "",
-      role: "",
-      statut: "Actif",
-      actif: true,
-      departement: "",
-      formation: "",
-      entreprise: "",
-      ville: ""
+      typeCompte: "",
+      statut: "ACTIF",
+      entityDocumentId: "",
+      entityType: ""
     });
     setSelectedCompte(null);
   };
@@ -251,97 +128,144 @@ export default function AdminCompte() {
   const handleOpenDialog = (compte) => {
     setSelectedCompte(compte);
     setFormData({
-      nom: compte.nom,
-      prenom: compte.prenom,
-      email: compte.email,
-      telephone: compte.telephone,
-      role: compte.role,
-      statut: compte.statut,
-      actif: compte.actif,
-      departement: compte.departement || "",
-      formation: compte.formation || "",
-      entreprise: compte.entreprise || "",
-      ville: compte.ville
+      email: compte.email || "",
+      typeCompte: compte.typeCompte || "",
+      statut: compte.statut || "ACTIF",
+      entityDocumentId: compte.entityDocumentId || "",
+      entityType: compte.entityType || ""
     });
     setOpenDialog(true);
   };
 
   // Sauvegarder le compte
-  const handleSaveCompte = () => {
-    if (selectedCompte) {
-      // Modification seulement
-      setComptes(prev => prev.map(c => 
-        c.id === selectedCompte.id 
-          ? { ...c, ...formData }
-          : c
-      ));
+  const handleSaveCompte = async () => {
+    try {
+      if (!formData.email || !formData.typeCompte) {
+        toast.error("Veuillez remplir tous les champs obligatoires");
+        return;
+      }
+
+      if (selectedCompte) {
+        // Modification
+        await axios.put(`${API_BASE_URL}/comptes-utilisateurs/${selectedCompte.documentId}`, formData);
+        toast.success("Compte modifié avec succès");
+      } else {
+        // Création (non implémentée dans cette vue)
+        toast.error("La création de compte se fait via les entités spécifiques");
+        return;
+      }
+      
+      await fetchComptes();
+      setOpenDialog(false);
+      resetForm();
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde:", error);
+      toast.error("Erreur lors de la sauvegarde du compte");
     }
-    setOpenDialog(false);
-    resetForm();
   };
 
-  // Basculer l'état actif/inactif
-  const handleToggleActif = (compteId) => {
-    setComptes(prev => prev.map(compte => 
-      compte.id === compteId 
-        ? { ...compte, actif: !compte.actif, statut: !compte.actif ? "Actif" : "Inactif" }
-        : compte
-    ));
+  // Activer/Désactiver un compte
+  const handleToggleStatus = async (documentId, currentStatus) => {
+    try {
+      if (currentStatus === "ACTIF") {
+        await axios.put(`${API_BASE_URL}/comptes-utilisateurs/${documentId}/desactiver`);
+        toast.success("Compte désactivé avec succès");
+      } else {
+        await axios.put(`${API_BASE_URL}/comptes-utilisateurs/${documentId}/activer`);
+        toast.success("Compte activé avec succès");
+      }
+      await fetchComptes();
+    } catch (error) {
+      console.error("Erreur lors du changement de statut:", error);
+      toast.error("Erreur lors du changement de statut");
+    }
+  };
+
+  // Supprimer un compte
+  const handleDeleteCompte = async (documentId) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce compte ?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API_BASE_URL}/comptes-utilisateurs/${documentId}`);
+      toast.success("Compte supprimé avec succès");
+      await fetchComptes();
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error("Erreur lors de la suppression du compte");
+    }
   };
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'Superieur': return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800';
-      case 'Encadreur': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
-      case 'Stagiaire': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'SUPERIEUR_HIERARCHIQUE': return 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800';
+      case 'ENCADREUR': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
+      case 'STAGIAIRE': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'ADMIN': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     }
   };
 
   const getStatutColor = (statut) => {
     switch (statut) {
-      case 'Actif': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300';
-      case 'Inactif': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300';
-      case 'Suspendu': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300';
+      case 'ACTIF': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300';
+      case 'INACTIF': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300';
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
     }
   };
 
   const getRoleIcon = (role) => {
     switch (role) {
-      case 'Superieur': return <Briefcase className="h-4 w-4" />;
-      case 'Encadreur': return <UserCog className="h-4 w-4" />;
-      case 'Stagiaire': return <GraduationCap className="h-4 w-4" />;
+      case 'SUPERIEUR_HIERARCHIQUE': return <Briefcase className="h-4 w-4" />;
+      case 'ENCADREUR': return <UserCog className="h-4 w-4" />;
+      case 'STAGIAIRE': return <GraduationCap className="h-4 w-4" />;
+      case 'ADMIN': return <Shield className="h-4 w-4" />;
       default: return <UserCheck className="h-4 w-4" />;
     }
   };
 
+  const getRoleLabel = (role) => {
+    switch (role) {
+      case 'SUPERIEUR_HIERARCHIQUE': return 'Supérieur';
+      case 'ENCADREUR': return 'Encadreur';
+      case 'STAGIAIRE': return 'Stagiaire';
+      case 'ADMIN': return 'Administrateur';
+      default: return role;
+    }
+  };
+
+  const getStatutLabel = (statut) => {
+    switch (statut) {
+      case 'ACTIF': return 'Actif';
+      case 'INACTIF': return 'Inactif';
+      default: return statut;
+    }
+  };
+
   // Listes uniques pour les filtres
-  const roles = [...new Set(comptes.map(c => c.role))];
+  const roles = [...new Set(comptes.map(c => c.typeCompte))];
   const statuts = [...new Set(comptes.map(c => c.statut))];
 
   const comptesFiltres = comptes.filter(compte => {
     const correspondRecherche = 
-      compte.nom.toLowerCase().includes(recherche.toLowerCase()) ||
-      compte.prenom.toLowerCase().includes(recherche.toLowerCase()) ||
-      compte.email.toLowerCase().includes(recherche.toLowerCase());
+      compte.email?.toLowerCase().includes(recherche.toLowerCase()) ||
+      compte.entityDocumentId?.toLowerCase().includes(recherche.toLowerCase());
     
-    const correspondRole = filtreRole === "tous" || compte.role === filtreRole;
+    const correspondRole = filtreRole === "tous" || compte.typeCompte === filtreRole;
     const correspondStatut = filtreStatut === "tous" || compte.statut === filtreStatut;
-    const correspondActif = filtreActif === "tous" || 
-      (filtreActif === "actif" && compte.actif) || 
-      (filtreActif === "inactif" && !compte.actif);
     
-    return correspondRecherche && correspondRole && correspondStatut && correspondActif;
+    return correspondRecherche && correspondRole && correspondStatut;
   });
 
   const stats = {
     total: comptes.length,
-    superieurs: comptes.filter(c => c.role === 'Superieur').length,
-    encadreurs: comptes.filter(c => c.role === 'Encadreur').length,
-    stagiaires: comptes.filter(c => c.role === 'Stagiaire').length,
-    actifs: comptes.filter(c => c.actif).length,
-    inactifs: comptes.filter(c => !c.actif).length
+    superieurs: comptes.filter(c => c.typeCompte === 'SUPERIEUR_HIERARCHIQUE').length,
+    encadreurs: comptes.filter(c => c.typeCompte === 'ENCADREUR').length,
+    stagiaires: comptes.filter(c => c.typeCompte === 'STAGIAIRE').length,
+    admins: comptes.filter(c => c.typeCompte === 'ADMIN').length,
+    actifs: comptes.filter(c => c.statut === 'ACTIF').length,
+    inactifs: comptes.filter(c => c.statut === 'INACTIF').length
   };
 
   const handleViewDetails = (compte) => {
@@ -354,6 +278,17 @@ export default function AdminCompte() {
     // Logique d'export
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des comptes...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 80 }}
@@ -362,6 +297,21 @@ export default function AdminCompte() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -375,7 +325,7 @@ export default function AdminCompte() {
               Gestion des Comptes Utilisateurs
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-lg">
-              Consultation et modification des comptes Superieurs, Encadreurs et Stagiaires
+              Administration des comptes Superieurs, Encadreurs, Stagiaires et Administrateurs
             </p>
           </div>
           <Button 
@@ -462,7 +412,7 @@ export default function AdminCompte() {
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Rechercher un compte..."
+                    placeholder="Rechercher par email ou ID..."
                     value={recherche}
                     onChange={(e) => setRecherche(e.target.value)}
                     className="pl-9 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600"
@@ -472,14 +422,14 @@ export default function AdminCompte() {
                 {/* Filtres */}
                 <div className="flex gap-2">
                   <Select value={filtreRole} onValueChange={setFiltreRole}>
-                    <SelectTrigger className="w-[140px] bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600">
+                    <SelectTrigger className="w-[160px] bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600">
                       <SelectValue placeholder="Rôle" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Tous les rôles</SelectItem>
                       {roles.map(role => (
                         <SelectItem key={role} value={role}>
-                          {role}
+                          {getRoleLabel(role)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -493,20 +443,9 @@ export default function AdminCompte() {
                       <SelectItem value="tous">Tous statuts</SelectItem>
                       {statuts.map(statut => (
                         <SelectItem key={statut} value={statut}>
-                          {statut}
+                          {getStatutLabel(statut)}
                         </SelectItem>
                       ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Select value={filtreActif} onValueChange={setFiltreActif}>
-                    <SelectTrigger className="w-[140px] bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600">
-                      <SelectValue placeholder="État" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tous">Tous états</SelectItem>
-                      <SelectItem value="actif">Actifs</SelectItem>
-                      <SelectItem value="inactif">Inactifs</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -530,112 +469,87 @@ export default function AdminCompte() {
           <CardHeader>
             <CardTitle>Liste des Comptes Utilisateurs</CardTitle>
             <CardDescription>
-              Consultation et gestion des comptes - Modification possible mais pas de suppression
+              Gestion complète des comptes - Activation, désactivation et modification
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Utilisateur</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Rôle & Informations</TableHead>
-                  <TableHead>Date Création</TableHead>
-                  <TableHead>Dernier Accès</TableHead>
+                  <TableHead>Compte</TableHead>
+                  <TableHead>Rôle & Entité</TableHead>
+                  <TableHead>Dates</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {comptesFiltres.map((compte) => (
-                  <TableRow key={compte.id}>
+                  <TableRow key={compte.documentId}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                           <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                            {compte.prenom[0]}{compte.nom[0]}
+                            {compte.email?.[0]?.toUpperCase()}
                           </AvatarFallback>
                         </Avatar>
                         <div>
                           <div className="font-medium text-gray-900 dark:text-white">
-                            {compte.prenom} {compte.nom}
+                            {compte.email}
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge className={getRoleColor(compte.role)}>
-                              <div className="flex items-center gap-1">
-                                {getRoleIcon(compte.role)}
-                                {compte.role}
-                              </div>
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm">
-                          <Mail className="h-3 w-3" />
-                          {compte.email}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                          <Phone className="h-3 w-3" />
-                          {compte.telephone}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        {compte.departement && (
-                          <div className="text-sm font-medium">{compte.departement}</div>
-                        )}
-                        {compte.formation && (
-                          <div className="text-sm">{compte.formation}</div>
-                        )}
-                        {compte.entreprise && (
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {compte.entreprise}
+                            ID: {compte.documentId}
                           </div>
-                        )}
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {compte.ville}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {new Date(compte.dateCreation).toLocaleDateString()}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {new Date(compte.dateCreation).toLocaleTimeString()}
+                      <div className="space-y-2">
+                        <Badge className={getRoleColor(compte.typeCompte)}>
+                          <div className="flex items-center gap-1">
+                            {getRoleIcon(compte.typeCompte)}
+                            {getRoleLabel(compte.typeCompte)}
+                          </div>
+                        </Badge>
+                        {compte.entityDocumentId && (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Entité: {compte.entityDocumentId}
+                          </div>
+                        )}
+                        {compte.entityType && (
+                          <div className="text-xs text-gray-400 dark:text-gray-500">
+                            Type: {compte.entityType}
+                          </div>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {new Date(compte.dateDerniereConnexion).toLocaleDateString()}
+                          Créé: {compte.createdAt ? new Date(compte.createdAt).toLocaleDateString() : 'N/A'}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {compte.dernierAcces}
+                          Modifié: {compte.updatedAt ? new Date(compte.updatedAt).toLocaleDateString() : 'N/A'}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col gap-2">
                         <Badge className={getStatutColor(compte.statut)}>
-                          {compte.statut}
+                          {getStatutLabel(compte.statut)}
                         </Badge>
                         <div className="flex items-center gap-2">
                           <Button
-                            variant={compte.actif ? "default" : "outline"}
+                            variant={compte.statut === "ACTIF" ? "default" : "outline"}
                             size="sm"
                             className={`h-7 px-2 text-xs ${
-                              compte.actif 
+                              compte.statut === "ACTIF" 
                                 ? "bg-emerald-500 hover:bg-emerald-600 text-white" 
                                 : "border-gray-300 text-gray-600"
                             }`}
-                            onClick={() => handleToggleActif(compte.id)}
+                            onClick={() => handleToggleStatus(compte.documentId, compte.statut)}
                           >
-                            {compte.actif ? (
+                            {compte.statut === "ACTIF" ? (
                               <>
                                 <CheckCircle className="h-3 w-3 mr-1" />
                                 Activé
@@ -655,8 +569,17 @@ export default function AdminCompte() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleToggleStatus(compte.documentId, compte.statut)}
+                          title={compte.statut === "ACTIF" ? "Désactiver" : "Activer"}
+                        >
+                          {compte.statut === "ACTIF" ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleOpenDialog(compte)}
-                          title="Modifier le compte"
+                          title="Modifier"
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -668,6 +591,16 @@ export default function AdminCompte() {
                           title="Voir détails"
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteCompte(compte.documentId)}
+                          title="Supprimer"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>
@@ -694,71 +627,41 @@ export default function AdminCompte() {
 
       {/* Dialogue de modification */}
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-        <DialogContent className="sm:max-w-[600px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-gray-900 dark:text-white">
               Modifier le Compte Utilisateur
             </DialogTitle>
             <DialogDescription className="text-gray-600 dark:text-gray-400">
-              Modifiez les informations du compte {selectedCompte?.prenom} {selectedCompte?.nom}
+              Modifiez les informations du compte {selectedCompte?.email}
             </DialogDescription>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="prenom" className="text-gray-700 dark:text-gray-300">Prénom</Label>
-                <Input
-                  id="prenom"
-                  value={formData.prenom}
-                  onChange={(e) => setFormData(prev => ({ ...prev, prenom: e.target.value }))}
-                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="nom" className="text-gray-700 dark:text-gray-300">Nom</Label>
-                <Input
-                  id="nom"
-                  value={formData.nom}
-                  onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
-                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email *</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                required
+              />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
-                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="telephone" className="text-gray-700 dark:text-gray-300">Téléphone</Label>
-                <Input
-                  id="telephone"
-                  value={formData.telephone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, telephone: e.target.value }))}
-                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="role" className="text-gray-700 dark:text-gray-300">Rôle</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}>
+                <Label htmlFor="typeCompte" className="text-gray-700 dark:text-gray-300">Rôle *</Label>
+                <Select value={formData.typeCompte} onValueChange={(value) => setFormData(prev => ({ ...prev, typeCompte: value }))}>
                   <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
-                    <SelectItem value="Superieur" className="text-gray-900 dark:text-white">Superieur</SelectItem>
-                    <SelectItem value="Encadreur" className="text-gray-900 dark:text-white">Encadreur</SelectItem>
-                    <SelectItem value="Stagiaire" className="text-gray-900 dark:text-white">Stagiaire</SelectItem>
+                    <SelectItem value="ADMIN" className="text-gray-900 dark:text-white">Administrateur</SelectItem>
+                    <SelectItem value="SUPERIEUR_HIERARCHIQUE" className="text-gray-900 dark:text-white">Supérieur</SelectItem>
+                    <SelectItem value="ENCADREUR" className="text-gray-900 dark:text-white">Encadreur</SelectItem>
+                    <SelectItem value="STAGIAIRE" className="text-gray-900 dark:text-white">Stagiaire</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -769,79 +672,40 @@ export default function AdminCompte() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
-                    <SelectItem value="Actif" className="text-gray-900 dark:text-white">Actif</SelectItem>
-                    <SelectItem value="Inactif" className="text-gray-900 dark:text-white">Inactif</SelectItem>
-                    <SelectItem value="Suspendu" className="text-gray-900 dark:text-white">Suspendu</SelectItem>
+                    <SelectItem value="ACTIF" className="text-gray-900 dark:text-white">Actif</SelectItem>
+                    <SelectItem value="INACTIF" className="text-gray-900 dark:text-white">Inactif</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="ville" className="text-gray-700 dark:text-gray-300">Ville</Label>
+              <Label htmlFor="entityDocumentId" className="text-gray-700 dark:text-gray-300">ID de l'Entité</Label>
               <Input
-                id="ville"
-                value={formData.ville}
-                onChange={(e) => setFormData(prev => ({ ...prev, ville: e.target.value }))}
+                id="entityDocumentId"
+                value={formData.entityDocumentId}
+                onChange={(e) => setFormData(prev => ({ ...prev, entityDocumentId: e.target.value }))}
                 className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                placeholder="ID de l'entité associée"
               />
             </div>
 
-            {formData.role === 'Superieur' || formData.role === 'Encadreur' ? (
-              <div className="space-y-2">
-                <Label htmlFor="departement" className="text-gray-700 dark:text-gray-300">Département</Label>
-                <Input
-                  id="departement"
-                  value={formData.departement}
-                  onChange={(e) => setFormData(prev => ({ ...prev, departement: e.target.value }))}
-                  className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                />
-              </div>
-            ) : formData.role === 'Stagiaire' && (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="formation" className="text-gray-700 dark:text-gray-300">Formation</Label>
-                  <Input
-                    id="formation"
-                    value={formData.formation}
-                    onChange={(e) => setFormData(prev => ({ ...prev, formation: e.target.value }))}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="entreprise" className="text-gray-700 dark:text-gray-300">Entreprise</Label>
-                  <Input
-                    id="entreprise"
-                    value={formData.entreprise}
-                    onChange={(e) => setFormData(prev => ({ ...prev, entreprise: e.target.value }))}
-                    className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="flex items-center space-x-2">
-              <Button
-                variant={formData.actif ? "default" : "outline"}
-                size="sm"
-                onClick={() => setFormData(prev => ({ ...prev, actif: !prev.actif }))}
-                className={formData.actif ? "bg-emerald-500 hover:bg-emerald-600" : ""}
+            <div className="space-y-2">
+              <Label htmlFor="entityType" className="text-gray-700 dark:text-gray-300">Type d'Entité</Label>
+              <Select 
+                value={formData.entityType} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, entityType: value }))}
               >
-                {formData.actif ? (
-                  <>
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    Compte activé
-                  </>
-                ) : (
-                  <>
-                    <XCircle className="h-4 w-4 mr-1" />
-                    Compte désactivé
-                  </>
-                )}
-              </Button>
-              <Label htmlFor="actif" className="text-gray-700 dark:text-gray-300">
-                {formData.actif ? 'Le compte est activé' : 'Le compte est désactivé'}
-              </Label>
+                <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
+                  <SelectValue placeholder="Sélectionner le type" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+                  <SelectItem value="ADMIN" className="text-gray-900 dark:text-white">Administrateur</SelectItem>
+                  <SelectItem value="SUPERIEUR_HIERARCHIQUE" className="text-gray-900 dark:text-white">Supérieur</SelectItem>
+                  <SelectItem value="ENCADREUR" className="text-gray-900 dark:text-white">Encadreur</SelectItem>
+                  <SelectItem value="STAGIAIRE" className="text-gray-900 dark:text-white">Stagiaire</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
 

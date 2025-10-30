@@ -111,13 +111,14 @@ public class StageController {
         }
     }
 
+    // CORRECTION: Mettre à jour cette méthode pour utiliser statutStage
     @PutMapping("/{documentId}/statut/{statut}")
     public ResponseEntity<StageDTO> updateStageStatut(
             @PathVariable String documentId,
             @PathVariable Stage.StatutStage statut) {
         return stageService.findByDocumentId(documentId)
                 .map(stage -> {
-                    stage.setStatut(statut);
+                    stage.setStatutStage(statut); // CHANGEMENT: setStatutStage()
                     StageDTO updatedStage = stageService.save(stage);
                     return ResponseEntity.ok(updatedStage);
                 })

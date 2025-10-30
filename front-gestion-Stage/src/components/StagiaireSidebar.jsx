@@ -102,12 +102,12 @@ export default function StagiaireSidebar({
 
   const getAvatarColor = (name) => {
     const colors = [
-      "bg-gradient-to-r from-emerald-500 to-emerald-600",
-      "bg-gradient-to-r from-blue-500 to-blue-600",
-      "bg-gradient-to-r from-green-500 to-green-600",
-      "bg-gradient-to-r from-purple-500 to-purple-600",
-      "bg-gradient-to-r from-teal-500 to-teal-600",
-      "bg-gradient-to-r from-indigo-500 to-indigo-600"
+      "bg-gradient-to-r from-blue-600 to-purple-600",
+      "bg-gradient-to-r from-indigo-600 to-purple-600",
+      "bg-gradient-to-r from-blue-600 to-indigo-600",
+      "bg-gradient-to-r from-purple-600 to-blue-600",
+      "bg-gradient-to-r from-blue-500 to-purple-700",
+      "bg-gradient-to-r from-indigo-500 to-purple-700"
     ];
     
     if (!name) return colors[0];

@@ -25,4 +25,8 @@ public class Admin extends BaseEntity {
     private String cin;
     
     private String fonction = "Administrateur";
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private StatutEntite statut = StatutEntite.ACTIF;
 }

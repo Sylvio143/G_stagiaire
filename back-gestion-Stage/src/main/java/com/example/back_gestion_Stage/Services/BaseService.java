@@ -13,6 +13,9 @@ public abstract class BaseService<T extends BaseEntity, D extends BaseDTO> {
     protected abstract D convertToDto(T entity);
     protected abstract T convertToEntity(D dto);
     
+    // NOUVELLE MÉTHODE ABSTRAITE POUR LA MISE À JOUR
+    protected abstract void updateEntityFromDto(T entity, D dto);
+    
     public List<D> findAll() {
         return getRepository().findAll().stream()
                 .map(this::convertToDto)
@@ -25,12 +28,32 @@ public abstract class BaseService<T extends BaseEntity, D extends BaseDTO> {
     }
     
     public Optional<D> findByDocumentId(String documentId) {
-        // Cette méthode doit être implémentée dans chaque service spécifique
-        return Optional.empty();
+        return getRepository().findAll().stream()
+                .filter(entity -> entity.getDocumentId().equals(documentId))
+                .findFirst()
+                .map(this::convertToDto);
     }
     
+    // MÉTHODE SAVE CORRIGÉE
     public D save(D dto) {
-        T entity = convertToEntity(dto);
+        T entity;
+        
+        if (dto.getId() != null) {
+            // MODIFICATION - Charger l'entité existante
+            Optional<T> existingEntity = getRepository().findById(dto.getId());
+            if (existingEntity.isPresent()) {
+                entity = existingEntity.get();
+                // Mettre à jour les champs avec la nouvelle méthode
+                updateEntityFromDto(entity, dto);
+            } else {
+                // Création si l'ID n'existe pas dans la base
+                entity = convertToEntity(dto);
+            }
+        } else {
+            // CRÉATION - Nouvelle entité
+            entity = convertToEntity(dto);
+        }
+        
         T savedEntity = getRepository().save(entity);
         return convertToDto(savedEntity);
     }

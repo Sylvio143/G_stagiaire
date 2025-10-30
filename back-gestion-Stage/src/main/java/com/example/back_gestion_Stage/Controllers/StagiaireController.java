@@ -1,6 +1,7 @@
 package com.example.back_gestion_Stage.Controllers;
 
 import com.example.back_gestion_Stage.DTOs.StagiaireDTO;
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import com.example.back_gestion_Stage.Services.StagiaireService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,12 @@ public class StagiaireController {
 
     @GetMapping
     public ResponseEntity<List<StagiaireDTO>> getAllStagiaires() {
+        List<StagiaireDTO> stagiaires = stagiaireService.findAllActifs();
+        return ResponseEntity.ok(stagiaires);
+    }
+
+    @GetMapping("/tous")
+    public ResponseEntity<List<StagiaireDTO>> getAllStagiairesWithInactifs() {
         List<StagiaireDTO> stagiaires = stagiaireService.findAll();
         return ResponseEntity.ok(stagiaires);
     }
@@ -52,6 +59,8 @@ public class StagiaireController {
             return ResponseEntity.badRequest().body(null);
         }
 
+        // S'assurer que le statut est ACTIF par défaut
+        stagiaireDTO.setStatut(StatutEntite.ACTIF);
         StagiaireDTO savedStagiaire = stagiaireService.save(stagiaireDTO);
         return ResponseEntity.ok(savedStagiaire);
     }
@@ -77,6 +86,32 @@ public class StagiaireController {
         return ResponseEntity.ok().build();
     }
 
+    // NOUVEAUX ENDPOINTS POUR LA GESTION DU STATUT
+    @PutMapping("/{documentId}/desactiver")
+    public ResponseEntity<StagiaireDTO> desactiverStagiaire(@PathVariable String documentId) {
+        StagiaireDTO stagiaire = stagiaireService.desactiver(documentId);
+        return stagiaire != null ? ResponseEntity.ok(stagiaire) : ResponseEntity.notFound().build();
+    }
+
+    @PutMapping("/{documentId}/activer")
+    public ResponseEntity<StagiaireDTO> activerStagiaire(@PathVariable String documentId) {
+        StagiaireDTO stagiaire = stagiaireService.activer(documentId);
+        return stagiaire != null ? ResponseEntity.ok(stagiaire) : ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/inactifs")
+    public ResponseEntity<List<StagiaireDTO>> getStagiairesInactifs() {
+        List<StagiaireDTO> stagiaires = stagiaireService.findByStatut(StatutEntite.INACTIF);
+        return ResponseEntity.ok(stagiaires);
+    }
+
+    @GetMapping("/statut/{statut}")
+    public ResponseEntity<List<StagiaireDTO>> getStagiairesByStatut(@PathVariable StatutEntite statut) {
+        List<StagiaireDTO> stagiaires = stagiaireService.findByStatut(statut);
+        return ResponseEntity.ok(stagiaires);
+    }
+
+    // ENDPOINTS EXISTANTS
     @GetMapping("/encadreur/{encadreurDocumentId}")
     public ResponseEntity<List<StagiaireDTO>> getStagiairesByEncadreur(@PathVariable String encadreurDocumentId) {
         List<StagiaireDTO> stagiaires = stagiaireService.findByEncadreur(encadreurDocumentId);

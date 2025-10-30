@@ -1,6 +1,7 @@
 package com.example.back_gestion_Stage.Controllers;
 
 import com.example.back_gestion_Stage.DTOs.SuperieurHierarchiqueDTO;
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import com.example.back_gestion_Stage.Services.SuperieurHierarchiqueService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,12 @@ public class SuperieurHierarchiqueController {
 
     @GetMapping
     public ResponseEntity<List<SuperieurHierarchiqueDTO>> getAllSuperieurs() {
+        List<SuperieurHierarchiqueDTO> superieurs = superieurHierarchiqueService.findAllActifs();
+        return ResponseEntity.ok(superieurs);
+    }
+
+    @GetMapping("/tous")
+    public ResponseEntity<List<SuperieurHierarchiqueDTO>> getAllSuperieursWithInactifs() {
         List<SuperieurHierarchiqueDTO> superieurs = superieurHierarchiqueService.findAll();
         return ResponseEntity.ok(superieurs);
     }
@@ -52,6 +59,8 @@ public class SuperieurHierarchiqueController {
             return ResponseEntity.badRequest().body(null);
         }
 
+        // S'assurer que le statut est ACTIF par défaut
+        superieurDTO.setStatut(StatutEntite.ACTIF);
         SuperieurHierarchiqueDTO savedSuperieur = superieurHierarchiqueService.save(superieurDTO);
         return ResponseEntity.ok(savedSuperieur);
     }
@@ -61,7 +70,16 @@ public class SuperieurHierarchiqueController {
         if (!superieurHierarchiqueService.findByDocumentId(documentId).isPresent()) {
             return ResponseEntity.notFound().build();
         }
-
+    
+        // Vérifications de doublons en excluant le supérieur actuel
+        if (superieurHierarchiqueService.existsByEmailAndNotId(superieurDTO.getEmail(), documentId)) {
+            return ResponseEntity.badRequest().body(null); // Ou retourner une erreur spécifique
+        }
+        
+        if (superieurHierarchiqueService.existsByCinAndNotId(superieurDTO.getCin(), documentId)) {
+            return ResponseEntity.badRequest().body(null); // Ou retourner une erreur spécifique
+        }
+    
         superieurDTO.setDocumentId(documentId);
         SuperieurHierarchiqueDTO updatedSuperieur = superieurHierarchiqueService.save(superieurDTO);
         return ResponseEntity.ok(updatedSuperieur);
@@ -77,6 +95,32 @@ public class SuperieurHierarchiqueController {
         return ResponseEntity.ok().build();
     }
 
+    // NOUVEAUX ENDPOINTS POUR LA GESTION DU STATUT
+    @PutMapping("/{documentId}/desactiver")
+    public ResponseEntity<SuperieurHierarchiqueDTO> desactiverSuperieur(@PathVariable String documentId) {
+        SuperieurHierarchiqueDTO superieur = superieurHierarchiqueService.desactiver(documentId);
+        return superieur != null ? ResponseEntity.ok(superieur) : ResponseEntity.notFound().build();
+    }
+
+    @PutMapping("/{documentId}/activer")
+    public ResponseEntity<SuperieurHierarchiqueDTO> activerSuperieur(@PathVariable String documentId) {
+        SuperieurHierarchiqueDTO superieur = superieurHierarchiqueService.activer(documentId);
+        return superieur != null ? ResponseEntity.ok(superieur) : ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/inactifs")
+    public ResponseEntity<List<SuperieurHierarchiqueDTO>> getSuperieursInactifs() {
+        List<SuperieurHierarchiqueDTO> superieurs = superieurHierarchiqueService.findByStatut(StatutEntite.INACTIF);
+        return ResponseEntity.ok(superieurs);
+    }
+
+    @GetMapping("/statut/{statut}")
+    public ResponseEntity<List<SuperieurHierarchiqueDTO>> getSuperieursByStatut(@PathVariable StatutEntite statut) {
+        List<SuperieurHierarchiqueDTO> superieurs = superieurHierarchiqueService.findByStatut(statut);
+        return ResponseEntity.ok(superieurs);
+    }
+
+    // ENDPOINTS EXISTANTS
     @GetMapping("/check-email/{email}")
     public ResponseEntity<Boolean> checkEmailExists(@PathVariable String email) {
         boolean exists = superieurHierarchiqueService.existsByEmail(email);

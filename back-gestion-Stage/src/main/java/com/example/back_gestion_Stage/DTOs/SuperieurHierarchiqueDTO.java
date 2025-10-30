@@ -1,5 +1,7 @@
+
 package com.example.back_gestion_Stage.DTOs;
 
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -13,6 +15,7 @@ public class SuperieurHierarchiqueDTO extends BaseDTO {
     private String cin;
     private String fonction;
     private String departement;
+    private StatutEntite statut;
     private MediaFileDTO photo;
     private String photoUrl;
     private String thumbnailUrl;

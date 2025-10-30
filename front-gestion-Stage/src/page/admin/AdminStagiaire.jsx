@@ -4,20 +4,20 @@ import {
   Users, 
   Plus, 
   Search, 
-  Filter,
   Edit2,
   Eye,
   Mail,
   Phone,
-  Building,
-  Calendar,
-  MapPin,
   UserCheck,
   Download,
+  Trash2,
+  UserX,
   GraduationCap,
   Link,
-  Briefcase,
-  Target
+  Target,
+  Calendar,
+  MapPin,
+  Building
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -72,122 +74,13 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration
-const stagiairesData = [
-  {
-    id: 1,
-    nom: "Dupont",
-    prenom: "Jean",
-    email: "jean.dupont@email.com",
-    telephone: "+33 6 12 34 56 78",
-    formation: "Développement Web Fullstack",
-    entreprise: "TechCorp Solutions",
-    dateDebut: "2024-09-01",
-    dateFin: "2025-02-28",
-    statut: "Actif",
-    progression: 75,
-    ville: "Paris",
-    encadreurId: 1,
-    encadreurNom: "Thomas Leroy",
-    specialite: "React, Node.js, MongoDB",
-    note: 16,
-    dernierRapport: "2024-12-01",
-    universite: "Université Paris-Saclay"
-  },
-  {
-    id: 2,
-    nom: "Martin",
-    prenom: "Marie",
-    email: "marie.martin@email.com",
-    telephone: "+33 6 23 45 67 89",
-    formation: "Design UX/UI Avancé",
-    entreprise: "CreativeLab Studio",
-    dateDebut: "2024-10-15",
-    dateFin: "2025-03-15",
-    statut: "Actif",
-    progression: 60,
-    ville: "Lyon",
-    encadreurId: 2,
-    encadreurNom: "Lucas Garcia",
-    specialite: "Figma, Prototypage, Recherche Utilisateur",
-    note: 14,
-    dernierRapport: "2024-11-28",
-    universite: "Université Lyon 2"
-  },
-  {
-    id: 3,
-    nom: "Bernard",
-    prenom: "Pierre",
-    email: "pierre.bernard@email.com",
-    telephone: "+33 6 34 56 78 90",
-    formation: "Data Science & Machine Learning",
-    entreprise: "DataInnov Analytics",
-    dateDebut: "2024-08-20",
-    dateFin: "2025-01-20",
-    statut: "En pause",
-    progression: 90,
-    ville: "Marseille",
-    encadreurId: 3,
-    encadreurNom: "Emma Roux",
-    specialite: "Python, Pandas, Scikit-learn",
-    note: 18,
-    dernierRapport: "2024-11-25",
-    universite: "Aix-Marseille Université"
-  },
-  {
-    id: 4,
-    nom: "Petit",
-    prenom: "Sophie",
-    email: "sophie.petit@email.com",
-    telephone: "+33 6 45 67 89 01",
-    formation: "Marketing Digital & Growth",
-    entreprise: "MarketPro Agency",
-    dateDebut: "2024-11-01",
-    dateFin: "2025-04-01",
-    statut: "Actif",
-    progression: 40,
-    ville: "Toulouse",
-    encadreurId: 4,
-    encadreurNom: "Sophie Petit",
-    specialite: "SEO, Analytics, Campagnes Social Media",
-    note: 15,
-    dernierRapport: "2024-11-30",
-    universite: "Université Toulouse 1 Capitole"
-  },
-  {
-    id: 5,
-    nom: "Leroy",
-    prenom: "Thomas",
-    email: "thomas.leroy@email.com",
-    telephone: "+33 6 56 78 90 12",
-    formation: "Cybersécurité Offensive",
-    entreprise: "SecureIT Systems",
-    dateDebut: "2024-07-10",
-    dateFin: "2024-12-10",
-    statut: "Terminé",
-    progression: 100,
-    ville: "Lille",
-    encadreurId: 1,
-    encadreurNom: "Thomas Leroy",
-    specialite: "Pentesting, Sécurité Réseau, Cryptographie",
-    note: 17,
-    dernierRapport: "2024-12-05",
-    universite: "Université de Lille"
-  }
-];
-
-const encadreursData = [
-  { id: 1, nom: "Leroy", prenom: "Thomas", departement: "Cybersécurité" },
-  { id: 2, nom: "Garcia", prenom: "Lucas", departement: "Mobile Development" },
-  { id: 3, nom: "Roux", prenom: "Emma", departement: "Data Science" },
-  { id: 4, nom: "Petit", prenom: "Sophie", departement: "Marketing Digital" },
-  { id: 5, nom: "Blanc", prenom: "Nicolas", departement: "Design UX/UI" }
-];
-
 export default function AdminStagiaire() {
-  const [stagiaires, setStagiaires] = useState(stagiairesData);
+  const [stagiaires, setStagiaires] = useState([]);
+  const [encadreurs, setEncadreurs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filtreStatut, setFiltreStatut] = useState("tous");
-  const [filtreFormation, setFiltreFormation] = useState("tous");
+  const [filtreEcole, setFiltreEcole] = useState("tous");
+  const [filtreFiliere, setFiltreFiliere] = useState("tous");
   const [filtreEncadreur, setFiltreEncadreur] = useState("tous");
   const [recherche, setRecherche] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
@@ -197,18 +90,70 @@ export default function AdminStagiaire() {
     prenom: "",
     email: "",
     telephone: "",
-    formation: "",
-    entreprise: "",
-    universite: "",
-    dateDebut: "",
-    dateFin: "",
-    ville: "",
-    statut: "Actif",
-    encadreurId: "",
-    specialite: "",
-    note: "",
-    progression: ""
+    cin: "",
+    ecole: "",
+    filiere: "",
+    niveauEtude: "",
+    dateNaissance: "",
+    adresse: "",
+    statut: "ACTIF",
+    encadreurDocumentId: "aucun"
   });
+
+  // Configuration Axios
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les stagiaires depuis l'API
+  const fetchStagiaires = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE_URL}/stagiaires/tous`);
+      setStagiaires(response.data);
+    } catch (error) {
+      console.error("Erreur lors du chargement des stagiaires:", error);
+      toast.error("Erreur lors du chargement des stagiaires");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Charger les encadreurs depuis l'API
+  const fetchEncadreurs = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/encadreurs/tous`);
+      setEncadreurs(response.data);
+    } catch (error) {
+      console.error("Erreur lors du chargement des encadreurs:", error);
+      toast.error("Erreur lors du chargement des encadreurs");
+    }
+  };
+
+  useEffect(() => {
+    fetchStagiaires();
+    fetchEncadreurs();
+  }, []);
+
+  // Vérifier si l'email existe déjà
+  const checkEmailExists = (email, currentDocumentId = null) => {
+    const stagiaireWithEmail = stagiaires.find(s => s.email === email);
+    
+    if (currentDocumentId && stagiaireWithEmail) {
+      return stagiaireWithEmail.documentId !== currentDocumentId;
+    }
+    
+    return !!stagiaireWithEmail;
+  };
+
+  // Vérifier si le CIN existe déjà
+  const checkCinExists = (cin, currentDocumentId = null) => {
+    const stagiaireWithCin = stagiaires.find(s => s.cin === cin);
+    
+    if (currentDocumentId && stagiaireWithCin) {
+      return stagiaireWithCin.documentId !== currentDocumentId;
+    }
+    
+    return !!stagiaireWithCin;
+  };
 
   // Réinitialiser le formulaire
   const resetForm = () => {
@@ -217,17 +162,14 @@ export default function AdminStagiaire() {
       prenom: "",
       email: "",
       telephone: "",
-      formation: "",
-      entreprise: "",
-      universite: "",
-      dateDebut: "",
-      dateFin: "",
-      ville: "",
-      statut: "Actif",
-      encadreurId: "",
-      specialite: "",
-      note: "",
-      progression: ""
+      cin: "",
+      ecole: "",
+      filiere: "",
+      niveauEtude: "",
+      dateNaissance: "",
+      adresse: "",
+      statut: "ACTIF",
+      encadreurDocumentId: "aucun"
     });
     setSelectedStagiaire(null);
   };
@@ -237,21 +179,18 @@ export default function AdminStagiaire() {
     if (stagiaire) {
       setSelectedStagiaire(stagiaire);
       setFormData({
-        nom: stagiaire.nom,
-        prenom: stagiaire.prenom,
-        email: stagiaire.email,
-        telephone: stagiaire.telephone,
-        formation: stagiaire.formation,
-        entreprise: stagiaire.entreprise,
-        universite: stagiaire.universite,
-        dateDebut: stagiaire.dateDebut,
-        dateFin: stagiaire.dateFin,
-        ville: stagiaire.ville,
-        statut: stagiaire.statut,
-        encadreurId: stagiaire.encadreurId?.toString() || "",
-        specialite: stagiaire.specialite,
-        note: stagiaire.note?.toString() || "",
-        progression: stagiaire.progression?.toString() || ""
+        nom: stagiaire.nom || "",
+        prenom: stagiaire.prenom || "",
+        email: stagiaire.email || "",
+        telephone: stagiaire.telephone || "",
+        cin: stagiaire.cin || "",
+        ecole: stagiaire.ecole || "",
+        filiere: stagiaire.filiere || "",
+        niveauEtude: stagiaire.niveauEtude || "",
+        dateNaissance: stagiaire.dateNaissance || "",
+        adresse: stagiaire.adresse || "",
+        statut: stagiaire.statut || "ACTIF",
+        encadreurDocumentId: stagiaire.encadreurDocumentId || "aucun"
       });
     } else {
       resetForm();
@@ -259,91 +198,162 @@ export default function AdminStagiaire() {
     setOpenDialog(true);
   };
 
-  // Sauvegarder le stagiaire
-  const handleSaveStagiaire = () => {
-    const selectedEncadreur = encadreursData.find(e => e.id.toString() === formData.encadreurId);
-    
-    if (selectedStagiaire) {
-      // Modification
-      setStagiaires(prev => prev.map(s => 
-        s.id === selectedStagiaire.id 
-          ? { 
-              ...s, 
-              ...formData,
-              encadreurId: formData.encadreurId ? parseInt(formData.encadreurId) : null,
-              encadreurNom: selectedEncadreur ? `${selectedEncadreur.prenom} ${selectedEncadreur.nom}` : "Non assigné",
-              note: formData.note ? parseFloat(formData.note) : null,
-              progression: formData.progression ? parseInt(formData.progression) : 0
-            }
-          : s
-      ));
-    } else {
-      // Création
-      const newStagiaire = {
-        ...formData,
-        id: Math.max(...stagiaires.map(s => s.id)) + 1,
-        encadreurId: formData.encadreurId ? parseInt(formData.encadreurId) : null,
-        encadreurNom: selectedEncadreur ? `${selectedEncadreur.prenom} ${selectedEncadreur.nom}` : "Non assigné",
-        note: formData.note ? parseFloat(formData.note) : null,
-        progression: formData.progression ? parseInt(formData.progression) : 0,
-        dernierRapport: new Date().toISOString().split('T')[0]
-      };
-      setStagiaires(prev => [...prev, newStagiaire]);
+  const handleSaveStagiaire = async () => {
+    try {
+      // Validation des champs requis
+      if (!formData.nom || !formData.prenom || !formData.email || !formData.telephone || !formData.cin) {
+        toast.error("Veuillez remplir tous les champs obligatoires");
+        return;
+      }
+
+      let response;
+      const encadreurId = formData.encadreurDocumentId === "aucun" ? null : formData.encadreurDocumentId;
+
+      if (selectedStagiaire) {
+        const dataToSend = { 
+          id: selectedStagiaire.id,
+          nom: formData.nom,
+          prenom: formData.prenom,
+          email: formData.email,
+          telephone: formData.telephone,
+          cin: formData.cin,
+          ecole: formData.ecole,
+          filiere: formData.filiere,
+          niveauEtude: formData.niveauEtude,
+          dateNaissance: formData.dateNaissance,
+          adresse: formData.adresse,
+          statut: formData.statut,
+          encadreurDocumentId: encadreurId
+        };
+        
+        response = await axios.put(`${API_BASE_URL}/stagiaires/${selectedStagiaire.documentId}`, dataToSend);
+        toast.success("Stagiaire modifié avec succès");
+      } else {
+        // Vérifications pour la création
+        if (checkEmailExists(formData.email)) {
+          toast.error("Cet email est déjà utilisé par un autre stagiaire");
+          return;
+        }
+        
+        if (checkCinExists(formData.cin)) {
+          toast.error("Ce CIN est déjà utilisé par un autre stagiaire");
+          return;
+        }
+
+        const dataToSend = {
+          ...formData,
+          encadreurDocumentId: encadreurId
+        };
+        
+        response = await axios.post(`${API_BASE_URL}/stagiaires`, dataToSend);
+        toast.success("Stagiaire créé avec succès");
+      }
+      
+      await fetchStagiaires();
+      setOpenDialog(false);
+      resetForm();
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde:", error);
+      if (error.response?.status === 500) {
+        const errorMessage = error.response.data?.message || '';
+        if (errorMessage.includes('cin')) {
+          toast.error("Ce CIN est déjà utilisé par un autre stagiaire");
+        } else if (errorMessage.includes('email')) {
+          toast.error("Cet email est déjà utilisé par un autre stagiaire");
+        } else {
+          toast.error("Erreur lors de la sauvegarde");
+        }
+      } else {
+        toast.error("Erreur lors de la sauvegarde");
+      }
     }
-    setOpenDialog(false);
-    resetForm();
+  };
+
+  // Supprimer un stagiaire
+  const handleDeleteStagiaire = async (documentId) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce stagiaire ?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API_BASE_URL}/stagiaires/${documentId}`);
+      toast.success("Stagiaire supprimé avec succès");
+      await fetchStagiaires();
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error("Erreur lors de la suppression du stagiaire");
+    }
+  };
+
+  // Activer/Désactiver un stagiaire
+  const handleToggleStatus = async (documentId, currentStatus) => {
+    try {
+      if (currentStatus === "ACTIF") {
+        await axios.put(`${API_BASE_URL}/stagiaires/${documentId}/desactiver`);
+        toast.success("Stagiaire désactivé avec succès");
+      } else {
+        await axios.put(`${API_BASE_URL}/stagiaires/${documentId}/activer`);
+        toast.success("Stagiaire activé avec succès");
+      }
+      await fetchStagiaires();
+    } catch (error) {
+      console.error("Erreur lors du changement de statut:", error);
+      toast.error("Erreur lors du changement de statut");
+    }
   };
 
   const getStatutColor = (statut) => {
     switch (statut) {
-      case 'Actif': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
-      case 'En pause': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
-      case 'Terminé': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
-      case 'Abandonné': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
+      case 'ACTIF': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'INACTIF': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     }
   };
 
-  const getNoteColor = (note) => {
-    if (note >= 16) return 'bg-emerald-100 text-emerald-700';
-    if (note >= 14) return 'bg-blue-100 text-blue-700';
-    if (note >= 12) return 'bg-amber-100 text-amber-700';
-    return 'bg-red-100 text-red-700';
+  const getStatutLabel = (statut) => {
+    switch (statut) {
+      case 'ACTIF': return 'Actif';
+      case 'INACTIF': return 'Inactif';
+      default: return statut;
+    }
   };
 
-  const getProgressionColor = (progression) => {
-    if (progression >= 80) return 'bg-emerald-500';
-    if (progression >= 60) return 'bg-blue-500';
-    if (progression >= 40) return 'bg-amber-500';
-    return 'bg-red-500';
+  // Obtenir le nom de l'encadreur
+  const getEncadreurNom = (encadreurDocumentId) => {
+    if (!encadreurDocumentId || encadreurDocumentId === "aucun") return "Non assigné";
+    const encadreur = encadreurs.find(e => e.documentId === encadreurDocumentId);
+    return encadreur ? `${encadreur.prenom} ${encadreur.nom}` : "Encadreur inconnu";
   };
 
-  // Listes uniques pour les filtres
-  const formations = [...new Set(stagiaires.map(s => s.formation))];
-  const encadreursList = [...new Set(stagiaires.map(s => s.encadreurNom).filter(Boolean))];
+  // Liste unique pour les filtres
+  const ecoles = [...new Set(stagiaires.map(s => s.ecole).filter(Boolean))];
+  const filieres = [...new Set(stagiaires.map(s => s.filiere).filter(Boolean))];
+  const encadreursList = [...new Set(stagiaires.map(s => s.encadreurDocumentId).filter(Boolean))];
 
   const stagiairesFiltres = stagiaires.filter(stagiaire => {
     const correspondRecherche = 
-      stagiaire.nom.toLowerCase().includes(recherche.toLowerCase()) ||
-      stagiaire.prenom.toLowerCase().includes(recherche.toLowerCase()) ||
-      stagiaire.email.toLowerCase().includes(recherche.toLowerCase()) ||
-      stagiaire.formation.toLowerCase().includes(recherche.toLowerCase()) ||
-      stagiaire.entreprise.toLowerCase().includes(recherche.toLowerCase());
+      stagiaire.nom?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stagiaire.prenom?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stagiaire.email?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stagiaire.ecole?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stagiaire.filiere?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stagiaire.cin?.toLowerCase().includes(recherche.toLowerCase());
     
     const correspondStatut = filtreStatut === "tous" || stagiaire.statut === filtreStatut;
-    const correspondFormation = filtreFormation === "tous" || stagiaire.formation === filtreFormation;
-    const correspondEncadreur = filtreEncadreur === "tous" || stagiaire.encadreurNom === filtreEncadreur;
+    const correspondEcole = filtreEcole === "tous" || stagiaire.ecole === filtreEcole;
+    const correspondFiliere = filtreFiliere === "tous" || stagiaire.filiere === filtreFiliere;
+    const correspondEncadreur = filtreEncadreur === "tous" || 
+      (filtreEncadreur === "non_assigné" ? !stagiaire.encadreurDocumentId : stagiaire.encadreurDocumentId === filtreEncadreur);
     
-    return correspondRecherche && correspondStatut && correspondFormation && correspondEncadreur;
+    return correspondRecherche && correspondStatut && correspondEcole && correspondFiliere && correspondEncadreur;
   });
 
   const stats = {
     total: stagiaires.length,
-    actifs: stagiaires.filter(s => s.statut === 'Actif').length,
-    termines: stagiaires.filter(s => s.statut === 'Terminé').length,
-    enPause: stagiaires.filter(s => s.statut === 'En pause').length,
-    moyenneNotes: Math.round(stagiaires.reduce((acc, s) => acc + (s.note || 0), 0) / stagiaires.filter(s => s.note).length),
-    sansEncadreur: stagiaires.filter(s => !s.encadreurId).length
+    actifs: stagiaires.filter(s => s.statut === 'ACTIF').length,
+    inactifs: stagiaires.filter(s => s.statut === 'INACTIF').length,
+    sansEncadreur: stagiaires.filter(s => !s.encadreurDocumentId).length,
+    avecStageActif: stagiaires.filter(s => s.hasActiveStage).length
   };
 
   const handleViewDetails = (stagiaire) => {
@@ -356,6 +366,17 @@ export default function AdminStagiaire() {
     // Logique d'export
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des stagiaires...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 80 }}
@@ -364,6 +385,21 @@ export default function AdminStagiaire() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -415,84 +451,68 @@ export default function AdminStagiaire() {
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="prenom" className="text-gray-700 dark:text-gray-300">Prénom</Label>
+                      <Label htmlFor="prenom" className="text-gray-700 dark:text-gray-300">Prénom *</Label>
                       <Input
                         id="prenom"
                         value={formData.prenom}
                         onChange={(e) => setFormData(prev => ({ ...prev, prenom: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="nom" className="text-gray-700 dark:text-gray-300">Nom</Label>
+                      <Label htmlFor="nom" className="text-gray-700 dark:text-gray-300">Nom *</Label>
                       <Input
                         id="nom"
                         value={formData.nom}
                         onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email</Label>
+                      <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email *</Label>
                       <Input
                         id="email"
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="telephone" className="text-gray-700 dark:text-gray-300">Téléphone</Label>
+                      <Label htmlFor="telephone" className="text-gray-700 dark:text-gray-300">Téléphone *</Label>
                       <Input
                         id="telephone"
                         value={formData.telephone}
                         onChange={(e) => setFormData(prev => ({ ...prev, telephone: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="formation" className="text-gray-700 dark:text-gray-300">Formation</Label>
+                      <Label htmlFor="cin" className="text-gray-700 dark:text-gray-300">CIN *</Label>
                       <Input
-                        id="formation"
-                        value={formData.formation}
-                        onChange={(e) => setFormData(prev => ({ ...prev, formation: e.target.value }))}
+                        id="cin"
+                        value={formData.cin}
+                        onChange={(e) => setFormData(prev => ({ ...prev, cin: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="entreprise" className="text-gray-700 dark:text-gray-300">Entreprise</Label>
+                      <Label htmlFor="niveauEtude" className="text-gray-700 dark:text-gray-300">Niveau d'étude</Label>
                       <Input
-                        id="entreprise"
-                        value={formData.entreprise}
-                        onChange={(e) => setFormData(prev => ({ ...prev, entreprise: e.target.value }))}
-                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="universite" className="text-gray-700 dark:text-gray-300">Université</Label>
-                      <Input
-                        id="universite"
-                        value={formData.universite}
-                        onChange={(e) => setFormData(prev => ({ ...prev, universite: e.target.value }))}
-                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="ville" className="text-gray-700 dark:text-gray-300">Ville</Label>
-                      <Input
-                        id="ville"
-                        value={formData.ville}
-                        onChange={(e) => setFormData(prev => ({ ...prev, ville: e.target.value }))}
+                        id="niveauEtude"
+                        value={formData.niveauEtude}
+                        onChange={(e) => setFormData(prev => ({ ...prev, niveauEtude: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
                       />
                     </div>
@@ -500,28 +520,36 @@ export default function AdminStagiaire() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="dateDebut" className="text-gray-700 dark:text-gray-300">Date de début</Label>
+                      <Label htmlFor="ecole" className="text-gray-700 dark:text-gray-300">École/Université</Label>
                       <Input
-                        id="dateDebut"
+                        id="ecole"
+                        value={formData.ecole}
+                        onChange={(e) => setFormData(prev => ({ ...prev, ecole: e.target.value }))}
+                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="filiere" className="text-gray-700 dark:text-gray-300">Filière</Label>
+                      <Input
+                        id="filiere"
+                        value={formData.filiere}
+                        onChange={(e) => setFormData(prev => ({ ...prev, filiere: e.target.value }))}
+                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="dateNaissance" className="text-gray-700 dark:text-gray-300">Date de naissance</Label>
+                      <Input
+                        id="dateNaissance"
                         type="date"
-                        value={formData.dateDebut}
-                        onChange={(e) => setFormData(prev => ({ ...prev, dateDebut: e.target.value }))}
+                        value={formData.dateNaissance}
+                        onChange={(e) => setFormData(prev => ({ ...prev, dateNaissance: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dateFin" className="text-gray-700 dark:text-gray-300">Date de fin</Label>
-                      <Input
-                        id="dateFin"
-                        type="date"
-                        value={formData.dateFin}
-                        onChange={(e) => setFormData(prev => ({ ...prev, dateFin: e.target.value }))}
-                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="statut" className="text-gray-700 dark:text-gray-300">Statut</Label>
                       <Select value={formData.statut} onValueChange={(value) => setFormData(prev => ({ ...prev, statut: value }))}>
@@ -529,67 +557,41 @@ export default function AdminStagiaire() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
-                          <SelectItem value="Actif" className="text-gray-900 dark:text-white">Actif</SelectItem>
-                          <SelectItem value="En pause" className="text-gray-900 dark:text-white">En pause</SelectItem>
-                          <SelectItem value="Terminé" className="text-gray-900 dark:text-white">Terminé</SelectItem>
-                          <SelectItem value="Abandonné" className="text-gray-900 dark:text-white">Abandonné</SelectItem>
+                          <SelectItem value="ACTIF" className="text-gray-900 dark:text-white">Actif</SelectItem>
+                          <SelectItem value="INACTIF" className="text-gray-900 dark:text-white">Inactif</SelectItem>
                         </SelectContent>
                       </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="encadreurId" className="text-gray-700 dark:text-gray-300">Encadreur Assigné</Label>
-                      <Select value={formData.encadreurId} onValueChange={(value) => setFormData(prev => ({ ...prev, encadreurId: value }))}>
-                        <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
-                          <SelectValue placeholder="Sélectionner un encadreur" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
-                          <SelectItem value="aucun" className="text-gray-900 dark:text-white">Aucun encadreur</SelectItem>
-                          {encadreursData.map(encadreur => (
-                            <SelectItem key={encadreur.id} value={encadreur.id.toString()} className="text-gray-900 dark:text-white">
-                              {encadreur.prenom} {encadreur.nom} - {encadreur.departement}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="specialite" className="text-gray-700 dark:text-gray-300">Spécialité</Label>
-                      <Input
-                        id="specialite"
-                        value={formData.specialite}
-                        onChange={(e) => setFormData(prev => ({ ...prev, specialite: e.target.value }))}
-                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="note" className="text-gray-700 dark:text-gray-300">Note (/20)</Label>
-                      <Input
-                        id="note"
-                        type="number"
-                        min="0"
-                        max="20"
-                        step="0.5"
-                        value={formData.note}
-                        onChange={(e) => setFormData(prev => ({ ...prev, note: e.target.value }))}
-                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                      />
                     </div>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="progression" className="text-gray-700 dark:text-gray-300">Progression (%)</Label>
+                    <Label htmlFor="adresse" className="text-gray-700 dark:text-gray-300">Adresse</Label>
                     <Input
-                      id="progression"
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={formData.progression}
-                      onChange={(e) => setFormData(prev => ({ ...prev, progression: e.target.value }))}
+                      id="adresse"
+                      value={formData.adresse}
+                      onChange={(e) => setFormData(prev => ({ ...prev, adresse: e.target.value }))}
                       className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="encadreurDocumentId" className="text-gray-700 dark:text-gray-300">Encadreur Assigné</Label>
+                    <Select 
+                      value={formData.encadreurDocumentId} 
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, encadreurDocumentId: value }))}
+                    >
+                      <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
+                        <SelectValue placeholder="Sélectionner un encadreur" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+                        <SelectItem value="aucun" className="text-gray-900 dark:text-white">Aucun encadreur</SelectItem>
+                        {encadreurs.map(encadreur => (
+                          <SelectItem key={encadreur.documentId} value={encadreur.documentId} className="text-gray-900 dark:text-white">
+                            {encadreur.prenom} {encadreur.nom} - {encadreur.departement}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
@@ -633,14 +635,14 @@ export default function AdminStagiaire() {
             title: "Stagiaires Actifs",
             icon: <UserCheck className="h-6 w-6 text-emerald-600" />,
             count: stats.actifs,
-            text: "En cours de formation",
+            text: "Actuellement actifs",
             gradient: "from-emerald-500 to-emerald-600"
           },
           {
-            title: "Moyenne des Notes",
+            title: "Avec Stage Actif",
             icon: <GraduationCap className="h-6 w-6 text-purple-600" />,
-            count: `${stats.moyenneNotes}/20`,
-            text: "Performance moyenne",
+            count: stats.avecStageActif,
+            text: "En stage actuellement",
             gradient: "from-purple-500 to-purple-600"
           },
           {
@@ -702,22 +704,34 @@ export default function AdminStagiaire() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Tous les statuts</SelectItem>
-                      <SelectItem value="Actif">Actifs</SelectItem>
-                      <SelectItem value="En pause">En pause</SelectItem>
-                      <SelectItem value="Terminé">Terminés</SelectItem>
-                      <SelectItem value="Abandonné">Abandonnés</SelectItem>
+                      <SelectItem value="ACTIF">Actifs</SelectItem>
+                      <SelectItem value="INACTIF">Inactifs</SelectItem>
                     </SelectContent>
                   </Select>
 
-                  <Select value={filtreFormation} onValueChange={setFiltreFormation}>
+                  <Select value={filtreEcole} onValueChange={setFiltreEcole}>
                     <SelectTrigger className="w-[160px] bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600">
-                      <SelectValue placeholder="Formation" />
+                      <SelectValue placeholder="École" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="tous">Toutes formations</SelectItem>
-                      {formations.map(formation => (
-                        <SelectItem key={formation} value={formation}>
-                          {formation}
+                      <SelectItem value="tous">Toutes écoles</SelectItem>
+                      {ecoles.map(ecole => (
+                        <SelectItem key={ecole} value={ecole}>
+                          {ecole}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={filtreFiliere} onValueChange={setFiltreFiliere}>
+                    <SelectTrigger className="w-[160px] bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600">
+                      <SelectValue placeholder="Filière" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tous">Toutes filières</SelectItem>
+                      {filieres.map(filiere => (
+                        <SelectItem key={filiere} value={filiere}>
+                          {filiere}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -729,11 +743,14 @@ export default function AdminStagiaire() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Tous les encadreurs</SelectItem>
-                      {encadreursList.map(encadreur => (
-                        <SelectItem key={encadreur} value={encadreur}>
-                          {encadreur}
-                        </SelectItem>
-                      ))}
+                      {encadreursList.map(encadreurId => {
+                        const encadreur = encadreurs.find(e => e.documentId === encadreurId);
+                        return encadreur ? (
+                          <SelectItem key={encadreurId} value={encadreurId}>
+                            {encadreur.prenom} {encadreur.nom}
+                          </SelectItem>
+                        ) : null;
+                      }).filter(Boolean)}
                       <SelectItem value="non_assigné">Non assigné</SelectItem>
                     </SelectContent>
                   </Select>
@@ -766,23 +783,24 @@ export default function AdminStagiaire() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Stagiaire</TableHead>
-                  <TableHead>Formation & Entreprise</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>École & Filière</TableHead>
                   <TableHead>Encadreur</TableHead>
-                  <TableHead>Période</TableHead>
-                  <TableHead>Progression</TableHead>
-                  <TableHead>Note</TableHead>
+                  <TableHead>CIN</TableHead>
+                  <TableHead>Stage Actif</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {stagiairesFiltres.map((stagiaire) => (
-                  <TableRow key={stagiaire.id}>
+                  <TableRow key={stagiaire.documentId}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
+                          <AvatarImage src={stagiaire.photoUrl} />
                           <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                            {stagiaire.prenom[0]}{stagiaire.nom[0]}
+                            {stagiaire.prenom?.[0]}{stagiaire.nom?.[0]}
                           </AvatarFallback>
                         </Avatar>
                         <div>
@@ -790,28 +808,40 @@ export default function AdminStagiaire() {
                             {stagiaire.prenom} {stagiaire.nom}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {stagiaire.ville}
+                            {stagiaire.adresse}
                           </div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="space-y-1">
-                        <div className="font-medium">{stagiaire.formation}</div>
+                        <div className="flex items-center gap-2 text-sm">
+                          <Mail className="h-3 w-3" />
+                          {stagiaire.email}
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                          <Phone className="h-3 w-3" />
+                          {stagiaire.telephone}
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="space-y-1">
+                        <div className="font-medium">{stagiaire.ecole}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {stagiaire.entreprise}
+                          {stagiaire.filiere}
                         </div>
                         <div className="text-xs text-gray-400 dark:text-gray-500">
-                          {stagiaire.universite}
+                          {stagiaire.niveauEtude}
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {stagiaire.encadreurNom ? (
+                        {stagiaire.encadreurDocumentId ? (
                           <Badge variant="outline" className="flex items-center gap-1">
                             <Link className="h-3 w-3" />
-                            {stagiaire.encadreurNom}
+                            {getEncadreurNom(stagiaire.encadreurDocumentId)}
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-amber-600 border-amber-300">
@@ -821,38 +851,16 @@ export default function AdminStagiaire() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="space-y-1">
-                        <div className="text-sm">
-                          {new Date(stagiaire.dateDebut).toLocaleDateString()}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {new Date(stagiaire.dateFin).toLocaleDateString()}
-                        </div>
-                      </div>
+                      <div className="font-mono text-sm">{stagiaire.cin}</div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                          <div 
-                            className={`h-2 rounded-full ${getProgressionColor(stagiaire.progression)}`}
-                            style={{ width: `${stagiaire.progression}%` }}
-                          />
-                        </div>
-                        <span className="text-sm font-medium">{stagiaire.progression}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {stagiaire.note ? (
-                        <Badge className={getNoteColor(stagiaire.note)}>
-                          {stagiaire.note}/20
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Non noté</Badge>
-                      )}
+                      <Badge className={stagiaire.hasActiveStage ? "bg-emerald-100 text-emerald-700" : "bg-gray-100 text-gray-700"}>
+                        {stagiaire.hasActiveStage ? "Oui" : "Non"}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatutColor(stagiaire.statut)}>
-                        {stagiaire.statut}
+                        {getStatutLabel(stagiaire.statut)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -860,8 +868,17 @@ export default function AdminStagiaire() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleToggleStatus(stagiaire.documentId, stagiaire.statut)}
+                          title={stagiaire.statut === "ACTIF" ? "Désactiver" : "Activer"}
+                        >
+                          {stagiaire.statut === "ACTIF" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleOpenDialog(stagiaire)}
-                          title="Modifier et changer d'encadreur"
+                          title="Modifier"
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -873,6 +890,16 @@ export default function AdminStagiaire() {
                           title="Voir détails"
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteStagiaire(stagiaire.documentId)}
+                          title="Supprimer"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

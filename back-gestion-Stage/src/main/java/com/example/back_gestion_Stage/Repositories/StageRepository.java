@@ -14,7 +14,7 @@ public interface StageRepository extends JpaRepository<Stage, Long> {
     Optional<Stage> findByDocumentId(String documentId);
     List<Stage> findByEncadreurDocumentId(String encadreurDocumentId);
     List<Stage> findBySuperieurHierarchiqueDocumentId(String superieurDocumentId);
-    List<Stage> findByStatut(Stage.StatutStage statut);
+    List<Stage> findByStatutStage(Stage.StatutStage statutStage);
     List<Stage> findByDateDebutBetween(LocalDate start, LocalDate end);
     List<Stage> findByDateFinBetween(LocalDate start, LocalDate end);
     

@@ -1,5 +1,6 @@
 package com.example.back_gestion_Stage.DTOs;
 
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -14,6 +15,7 @@ public class EncadreurDTO extends BaseDTO {
     private String fonction;
     private String departement;
     private String specialite;
+    private StatutEntite statut;
     private MediaFileDTO photo;
     private String superieurHierarchiqueDocumentId;
     private String photoUrl;

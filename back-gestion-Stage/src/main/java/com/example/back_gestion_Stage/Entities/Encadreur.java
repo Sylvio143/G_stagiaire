@@ -33,9 +33,13 @@ public class Encadreur extends BaseEntity {
     
     private String specialite;
     
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private StatutEntite statut = StatutEntite.ACTIF;
+    
     @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-@JoinColumn(name = "photo_document_id", referencedColumnName = "documentId")
-private MediaFile photo;
+    @JoinColumn(name = "photo_document_id", referencedColumnName = "documentId")
+    private MediaFile photo;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "superieur_document_id", referencedColumnName = "documentId")
@@ -47,7 +51,6 @@ private MediaFile photo;
     @OneToMany(mappedBy = "encadreur", cascade = CascadeType.ALL)
     private List<Stage> stages = new ArrayList<>();
     
-    // Méthodes utilitaires
     public String getPhotoUrl() {
         return this.photo != null ? this.photo.getUrl() : null;
     }

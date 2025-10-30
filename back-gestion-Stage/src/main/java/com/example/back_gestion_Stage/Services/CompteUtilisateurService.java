@@ -2,10 +2,12 @@ package com.example.back_gestion_Stage.Services;
 
 import com.example.back_gestion_Stage.Entities.CompteUtilisateur;
 import com.example.back_gestion_Stage.DTOs.CompteUtilisateurDTO;
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import com.example.back_gestion_Stage.Repositories.CompteUtilisateurRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -32,11 +34,10 @@ public class CompteUtilisateurService extends BaseService<CompteUtilisateur, Com
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         dto.setEmail(entity.getEmail());
-        // Ne pas exposer le mot de passe dans le DTO pour des raisons de sécurité
-        // dto.setMotDePasse(entity.getMotDePasse());
         dto.setTypeCompte(entity.getTypeCompte());
         dto.setEntityDocumentId(entity.getEntityDocumentId());
         dto.setEntityType(entity.getEntityType());
+        dto.setStatut(entity.getStatut());
         return dto;
     }
 
@@ -46,12 +47,11 @@ public class CompteUtilisateurService extends BaseService<CompteUtilisateur, Com
         entity.setId(dto.getId());
         entity.setDocumentId(dto.getDocumentId());
         entity.setEmail(dto.getEmail());
+        entity.setStatut(dto.getStatut());
         
-        // Encoder le mot de passe s'il est fourni
         if (dto.getMotDePasse() != null && !dto.getMotDePasse().isEmpty()) {
             entity.setMotDePasse(passwordEncoder.encode(dto.getMotDePasse()));
         } else if (dto.getId() != null) {
-            // Si c'est une mise à jour et que le mot de passe n'est pas fourni, conserver l'ancien
             compteUtilisateurRepository.findById(dto.getId())
                 .ifPresent(existingCompte -> entity.setMotDePasse(existingCompte.getMotDePasse()));
         }
@@ -62,47 +62,68 @@ public class CompteUtilisateurService extends BaseService<CompteUtilisateur, Com
         return entity;
     }
 
+    // NOUVELLE MÉTHODE POUR LA MISE À JOUR
     @Override
-    public Optional<CompteUtilisateurDTO> findByDocumentId(String documentId) {
-        return compteUtilisateurRepository.findByDocumentId(documentId)
-                .map(this::convertToDto);
+    protected void updateEntityFromDto(CompteUtilisateur entity, CompteUtilisateurDTO dto) {
+        if (dto.getEmail() != null) entity.setEmail(dto.getEmail());
+        if (dto.getStatut() != null) entity.setStatut(dto.getStatut());
+        if (dto.getTypeCompte() != null) entity.setTypeCompte(dto.getTypeCompte());
+        if (dto.getEntityDocumentId() != null) entity.setEntityDocumentId(dto.getEntityDocumentId());
+        if (dto.getEntityType() != null) entity.setEntityType(dto.getEntityType());
+        
+        // Gestion spéciale du mot de passe
+        if (dto.getMotDePasse() != null && !dto.getMotDePasse().isEmpty()) {
+            entity.setMotDePasse(passwordEncoder.encode(dto.getMotDePasse()));
+        }
+        // Ne pas mettre à jour : id, documentId, createdAt, updatedAt
+    }
+
+    // MÉTHODE AJOUTÉE POUR CORRIGER L'ERREUR
+    public List<CompteUtilisateurDTO> findByEntityDocumentId(String entityDocumentId) {
+        return compteUtilisateurRepository.findByEntityDocumentId(entityDocumentId)
+                .stream()
+                .filter(compte -> compte.getStatut() == StatutEntite.ACTIF)
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    // Les autres méthodes restent inchangées...
+    public List<CompteUtilisateurDTO> findAllActifs() {
+        return compteUtilisateurRepository.findAll().stream()
+                .filter(compte -> compte.getStatut() == StatutEntite.ACTIF)
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 
     public Optional<CompteUtilisateurDTO> findByEmail(String email) {
         return compteUtilisateurRepository.findByEmail(email)
+                .filter(compte -> compte.getStatut() == StatutEntite.ACTIF)
                 .map(this::convertToDto);
     }
 
     public List<CompteUtilisateurDTO> findByTypeCompte(CompteUtilisateur.TypeCompte typeCompte) {
         return compteUtilisateurRepository.findByTypeCompte(typeCompte)
                 .stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
-    }
-
-    public List<CompteUtilisateurDTO> findByEntityDocumentId(String entityDocumentId) {
-        return compteUtilisateurRepository.findByEntityDocumentId(entityDocumentId)
-                .stream()
+                .filter(compte -> compte.getStatut() == StatutEntite.ACTIF)
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
 
     public boolean existsByEmail(String email) {
-        return compteUtilisateurRepository.existsByEmail(email);
+        return compteUtilisateurRepository.findByEmail(email)
+                .map(compte -> compte.getStatut() == StatutEntite.ACTIF)
+                .orElse(false);
     }
 
     public boolean verifyPassword(String rawPassword, String encodedPassword) {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }
 
-    // NOUVELLES MÉTHODES MANQUANTES
     public CompteUtilisateurDTO createCompteUtilisateur(CompteUtilisateurDTO compteDTO) {
-        // Vérifier si l'email existe déjà
         if (existsByEmail(compteDTO.getEmail())) {
             throw new RuntimeException("Un compte avec cet email existe déjà");
         }
         
-        // S'assurer que le mot de passe est fourni
         if (compteDTO.getMotDePasse() == null || compteDTO.getMotDePasse().isEmpty()) {
             throw new RuntimeException("Le mot de passe est obligatoire");
         }
@@ -117,7 +138,8 @@ public class CompteUtilisateurService extends BaseService<CompteUtilisateur, Com
         
         if (compteOpt.isPresent()) {
             CompteUtilisateur compte = compteOpt.get();
-            if (verifyPassword(password, compte.getMotDePasse())) {
+            if (compte.getStatut() == StatutEntite.ACTIF && 
+                verifyPassword(password, compte.getMotDePasse())) {
                 return Optional.of(convertToDto(compte));
             }
         }
@@ -144,7 +166,35 @@ public class CompteUtilisateurService extends BaseService<CompteUtilisateur, Com
                 .ifPresent(compte -> compteUtilisateurRepository.deleteById(compte.getId()));
     }
 
-    // Méthode utilitaire pour créer un compte automatiquement lors de la création d'un utilisateur
+    public CompteUtilisateurDTO desactiver(String documentId) {
+        Optional<CompteUtilisateur> compteOpt = compteUtilisateurRepository.findByDocumentId(documentId);
+        if (compteOpt.isPresent()) {
+            CompteUtilisateur compte = compteOpt.get();
+            compte.setStatut(StatutEntite.INACTIF);
+            CompteUtilisateur savedCompte = compteUtilisateurRepository.save(compte);
+            return convertToDto(savedCompte);
+        }
+        return null;
+    }
+
+    public CompteUtilisateurDTO activer(String documentId) {
+        Optional<CompteUtilisateur> compteOpt = compteUtilisateurRepository.findByDocumentId(documentId);
+        if (compteOpt.isPresent()) {
+            CompteUtilisateur compte = compteOpt.get();
+            compte.setStatut(StatutEntite.ACTIF);
+            CompteUtilisateur savedCompte = compteUtilisateurRepository.save(compte);
+            return convertToDto(savedCompte);
+        }
+        return null;
+    }
+
+    public List<CompteUtilisateurDTO> findByStatut(StatutEntite statut) {
+        return compteUtilisateurRepository.findAll().stream()
+                .filter(compte -> compte.getStatut() == statut)
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
     public CompteUtilisateurDTO createCompteForEntity(String email, String password, 
                                                     CompteUtilisateur.TypeCompte typeCompte, 
                                                     String entityDocumentId) {
@@ -153,15 +203,16 @@ public class CompteUtilisateurService extends BaseService<CompteUtilisateur, Com
         compteDTO.setMotDePasse(password);
         compteDTO.setTypeCompte(typeCompte);
         compteDTO.setEntityDocumentId(entityDocumentId);
-        compteDTO.setEntityType(typeCompte); // Même type pour entityType
+        compteDTO.setEntityType(typeCompte);
+        compteDTO.setStatut(StatutEntite.ACTIF);
         
         return createCompteUtilisateur(compteDTO);
     }
 
-    // Méthode pour récupérer le compte associé à une entité
     public Optional<CompteUtilisateurDTO> findByEntity(String entityDocumentId, CompteUtilisateur.TypeCompte entityType) {
         return compteUtilisateurRepository.findByEntityDocumentIdAndEntityType(entityDocumentId, entityType)
                 .stream()
+                .filter(compte -> compte.getStatut() == StatutEntite.ACTIF)
                 .findFirst()
                 .map(this::convertToDto);
     }

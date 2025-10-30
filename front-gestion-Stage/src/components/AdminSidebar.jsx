@@ -111,14 +111,12 @@ export default function AdminSidebar({
   // Fonction pour générer la couleur basée sur le nom
   const getAvatarColor = (name) => {
     const colors = [
-      "bg-gradient-to-r from-blue-500 to-blue-600",
-      "bg-gradient-to-r from-purple-500 to-purple-600", 
-      "bg-gradient-to-r from-green-500 to-green-600",
-      "bg-gradient-to-r from-red-500 to-red-600",
-      "bg-gradient-to-r from-yellow-500 to-yellow-600",
-      "bg-gradient-to-r from-indigo-500 to-indigo-600",
-      "bg-gradient-to-r from-pink-500 to-pink-600",
-      "bg-gradient-to-r from-teal-500 to-teal-600"
+     "bg-gradient-to-r from-blue-600 to-purple-600",
+      "bg-gradient-to-r from-indigo-600 to-purple-600",
+      "bg-gradient-to-r from-blue-600 to-indigo-600",
+      "bg-gradient-to-r from-purple-600 to-blue-600",
+      "bg-gradient-to-r from-blue-500 to-purple-700",
+      "bg-gradient-to-r from-indigo-500 to-purple-700"
     ];
     
     if (!name) return colors[0];

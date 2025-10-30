@@ -14,7 +14,7 @@ public class StageDTO extends BaseDTO {
     private String description;
     private LocalDate dateDebut;
     private LocalDate dateFin;
-    private Stage.StatutStage statut;
+    private Stage.StatutStage statutStage; // CHANGEMENT: statutStage au lieu de statut
     private String encadreurDocumentId;
     private String superieurHierarchiqueDocumentId;
     private List<String> stagiairesDocumentIds = new ArrayList<>();

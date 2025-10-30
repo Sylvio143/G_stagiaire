@@ -39,20 +39,21 @@ public class Stagiaire extends BaseEntity {
     
     private String adresse;
     
-    @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-@JoinColumn(name = "photo_document_id", referencedColumnName = "documentId")
-private MediaFile photo;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private StatutEntite statut = StatutEntite.ACTIF;
     
-    // Relation avec l'encadreur
+    @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinColumn(name = "photo_document_id", referencedColumnName = "documentId")
+    private MediaFile photo;
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "encadreur_document_id", referencedColumnName = "documentId")
     private Encadreur encadreur;
     
-    // Relation DIRECTE avec les stages (Many-to-Many)
     @ManyToMany(mappedBy = "stagiaires")
     private List<Stage> stages = new ArrayList<>();
     
-    // Méthodes utilitaires pour accéder facilement aux URLs
     public String getPhotoUrl() {
         return this.photo != null ? this.photo.getUrl() : null;
     }
@@ -65,7 +66,7 @@ private MediaFile photo;
         return this.photo != null ? this.photo.getMediumUrl() : null;
     }
     
-    // Méthode pour vérifier si le stagiaire a un stage actif
+    // CORRECTION: Mettre à jour les méthodes qui utilisaient statut
     public boolean hasActiveStage() {
         if (stages == null || stages.isEmpty()) {
             return false;
@@ -74,13 +75,13 @@ private MediaFile photo;
         LocalDate now = LocalDate.now();
         return stages.stream()
                 .anyMatch(stage -> 
-                    stage.getStatut() == Stage.StatutStage.EN_COURS &&
+                    stage.getStatutStage() == Stage.StatutStage.EN_COURS && // CHANGEMENT: getStatutStage()
                     !stage.getDateDebut().isAfter(now) &&
                     !stage.getDateFin().isBefore(now)
                 );
     }
     
-    // Méthode pour obtenir le stage actuel
+    // CORRECTION: Mettre à jour getCurrentStage
     public Stage getCurrentStage() {
         if (stages == null || stages.isEmpty()) {
             return null;
@@ -89,7 +90,7 @@ private MediaFile photo;
         LocalDate now = LocalDate.now();
         return stages.stream()
                 .filter(stage -> 
-                    stage.getStatut() == Stage.StatutStage.EN_COURS &&
+                    stage.getStatutStage() == Stage.StatutStage.EN_COURS && // CHANGEMENT: getStatutStage()
                     !stage.getDateDebut().isAfter(now) &&
                     !stage.getDateFin().isBefore(now)
                 )

@@ -32,10 +32,13 @@ public class SuperieurHierarchique extends BaseEntity {
     
     private String departement;
     
-    // Relation ONE-TO-ONE pour la photo de profil
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private StatutEntite statut = StatutEntite.ACTIF;
+    
     @OneToOne(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
-        @JoinColumn(name = "photo_document_id", referencedColumnName = "documentId")
-        private MediaFile photo;
+    @JoinColumn(name = "photo_document_id", referencedColumnName = "documentId")
+    private MediaFile photo;
     
     @OneToMany(mappedBy = "superieurHierarchique", cascade = CascadeType.ALL)
     private List<Encadreur> encadreurs = new ArrayList<>();
@@ -43,7 +46,6 @@ public class SuperieurHierarchique extends BaseEntity {
     @OneToMany(mappedBy = "superieurHierarchique", cascade = CascadeType.ALL)
     private List<Stage> stages = new ArrayList<>();
     
-    // Méthodes utilitaires
     public String getPhotoUrl() {
         return this.photo != null ? this.photo.getUrl() : null;
     }

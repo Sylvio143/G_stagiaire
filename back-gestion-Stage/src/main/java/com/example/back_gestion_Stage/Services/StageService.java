@@ -49,9 +49,8 @@ public class StageService extends BaseService<Stage, StageDTO> {
         dto.setDescription(entity.getDescription());
         dto.setDateDebut(entity.getDateDebut());
         dto.setDateFin(entity.getDateFin());
-        dto.setStatut(entity.getStatut());
+        dto.setStatutStage(entity.getStatutStage());
         
-        // Charger les relations ManyToOne
         if (entity.getEncadreur() != null) {
             dto.setEncadreurDocumentId(entity.getEncadreur().getDocumentId());
         }
@@ -60,7 +59,6 @@ public class StageService extends BaseService<Stage, StageDTO> {
             dto.setSuperieurHierarchiqueDocumentId(entity.getSuperieurHierarchique().getDocumentId());
         }
         
-        // Charger les relations ManyToMany
         if (entity.getStagiaires() != null) {
             dto.setStagiairesDocumentIds(
                 entity.getStagiaires().stream()
@@ -81,9 +79,8 @@ public class StageService extends BaseService<Stage, StageDTO> {
         entity.setDescription(dto.getDescription());
         entity.setDateDebut(dto.getDateDebut());
         entity.setDateFin(dto.getDateFin());
-        entity.setStatut(dto.getStatut());
+        entity.setStatutStage(dto.getStatutStage());
         
-        // Établir les relations ManyToOne
         if (dto.getEncadreurDocumentId() != null) {
             encadreurRepository.findByDocumentId(dto.getEncadreurDocumentId())
                 .ifPresent(entity::setEncadreur);
@@ -94,7 +91,6 @@ public class StageService extends BaseService<Stage, StageDTO> {
                 .ifPresent(entity::setSuperieurHierarchique);
         }
         
-        // Établir les relations ManyToMany
         if (dto.getStagiairesDocumentIds() != null) {
             List<Stagiaire> stagiaires = dto.getStagiairesDocumentIds().stream()
                 .map(stagiaireDocId -> stagiaireRepository.findByDocumentId(stagiaireDocId).orElse(null))
@@ -106,27 +102,19 @@ public class StageService extends BaseService<Stage, StageDTO> {
         return entity;
     }
 
-    // Méthode pour créer un stage avec toutes les relations
-    @Transactional
-    public StageDTO createStageWithRelations(StageDTO stageDTO) {
-        Stage stage = convertToEntity(stageDTO);
-        Stage savedStage = stageRepository.save(stage);
-        return convertToDto(savedStage);
-    }
-
-    // Surcharger la méthode save pour gérer les relations
+    // NOUVELLE MÉTHODE POUR LA MISE À JOUR
     @Override
-    @Transactional
-    public StageDTO save(StageDTO dto) {
-        return createStageWithRelations(dto);
+    protected void updateEntityFromDto(Stage entity, StageDTO dto) {
+        if (dto.getTitre() != null) entity.setTitre(dto.getTitre());
+        if (dto.getDescription() != null) entity.setDescription(dto.getDescription());
+        if (dto.getDateDebut() != null) entity.setDateDebut(dto.getDateDebut());
+        if (dto.getDateFin() != null) entity.setDateFin(dto.getDateFin());
+        if (dto.getStatutStage() != null) entity.setStatutStage(dto.getStatutStage());
+        // Ne pas mettre à jour : id, documentId, createdAt, updatedAt, encadreur, superieurHierarchique, stagiaires
+        // Les relations doivent être gérées via des méthodes spécifiques
     }
 
-    @Override
-    public Optional<StageDTO> findByDocumentId(String documentId) {
-        return stageRepository.findByDocumentId(documentId)
-                .map(this::convertToDto);
-    }
-
+    // Les autres méthodes restent inchangées mais utilisent maintenant statutStage
     public List<StageDTO> findByEncadreur(String encadreurDocumentId) {
         return stageRepository.findByEncadreurDocumentId(encadreurDocumentId)
                 .stream()
@@ -142,7 +130,7 @@ public class StageService extends BaseService<Stage, StageDTO> {
     }
 
     public List<StageDTO> findByStatut(Stage.StatutStage statut) {
-        return stageRepository.findByStatut(statut)
+        return stageRepository.findByStatutStage(statut)
                 .stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());

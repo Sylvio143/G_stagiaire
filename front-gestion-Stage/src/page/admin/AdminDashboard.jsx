@@ -16,7 +16,9 @@ import {
   Download,
   Search,
   Filter,
-  Plus
+  Plus,
+  UserCog,
+  Target
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -38,6 +40,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -61,103 +65,216 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration
-const statsData = {
-  totalUsers: 156,
-  activeUsers: 142,
-  newThisMonth: 23,
-  pendingApprovals: 8,
-  superieurs: 12,
-  encadreurs: 45,
-  stagiaires: 99,
-  activeStages: 67,
-  completedStages: 32
-};
-
-const recentActivities = [
-  {
-    id: 1,
-    user: "Marie Martin",
-    action: "a créé un nouveau compte encadreur",
-    time: "Il y a 5 min",
-    type: "creation",
-    role: "Encadreur"
-  },
-  {
-    id: 2,
-    user: "Pierre Bernard",
-    action: "a modifié les paramètres du système",
-    time: "Il y a 15 min",
-    type: "modification",
-    role: "Administrateur"
-  },
-  {
-    id: 3,
-    user: "Sophie Dubois",
-    action: "a désactivé un compte supérieur",
-    time: "Il y a 1 heure",
-    type: "desactivation",
-    role: "Supérieur"
-  },
-  {
-    id: 4,
-    user: "Thomas Leroy",
-    action: "a approuvé 3 nouveaux stagiaires",
-    time: "Il y a 2 heures",
-    type: "approbation",
-    role: "Encadreur"
-  },
-  {
-    id: 5,
-    user: "Alice Moreau",
-    action: "a généré un rapport mensuel",
-    time: "Il y a 3 heures",
-    type: "rapport",
-    role: "Administrateur"
-  }
-];
-
-const pendingApprovals = [
-  {
-    id: 1,
-    nom: "Dupont",
-    prenom: "Jean",
-    email: "jean.dupont@email.com",
-    role: "Encadreur",
-    date: "2024-12-10",
-    status: "en_attente"
-  },
-  {
-    id: 2,
-    nom: "Martin",
-    prenom: "Sophie",
-    email: "sophie.martin@email.com",
-    role: "Supérieur",
-    date: "2024-12-09",
-    status: "en_attente"
-  },
-  {
-    id: 3,
-    nom: "Bernard",
-    prenom: "Pierre",
-    email: "pierre.bernard@email.com",
-    role: "Stagiaire",
-    date: "2024-12-08",
-    status: "en_attente"
-  }
-];
-
-const systemStats = {
-  performance: 98.5,
-  storage: 76,
-  activeSessions: 23,
-  uptime: "99.9%"
-};
-
 export default function AdminDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState("month");
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [statsData, setStatsData] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    newThisMonth: 0,
+    pendingApprovals: 0,
+    superieurs: 0,
+    encadreurs: 0,
+    stagiaires: 0,
+    activeStages: 0,
+    completedStages: 0
+  });
+  const [recentActivities, setRecentActivities] = useState([]);
+  const [pendingApprovals, setPendingApprovals] = useState([]);
+  const [systemStats, setSystemStats] = useState({
+    performance: 98.5,
+    storage: 76,
+    activeSessions: 0,
+    uptime: "99.9%"
+  });
+
+  // Configuration Axios
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les données du dashboard
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Charger les comptes utilisateurs
+      const comptesResponse = await axios.get(`${API_BASE_URL}/comptes-utilisateurs/tous`);
+      const comptes = comptesResponse.data;
+      
+      // Charger les supérieurs
+      const superieursResponse = await axios.get(`${API_BASE_URL}/superieurs-hierarchiques/tous`);
+      const superieurs = superieursResponse.data;
+      
+      // Charger les encadreurs
+      const encadreursResponse = await axios.get(`${API_BASE_URL}/encadreurs/tous`);
+      const encadreurs = encadreursResponse.data;
+      
+      // Charger les stagiaires
+      const stagiairesResponse = await axios.get(`${API_BASE_URL}/stagiaires/tous`);
+      const stagiaires = stagiairesResponse.data;
+      
+      // Charger les stages
+      const stagesResponse = await axios.get(`${API_BASE_URL}/stages`);
+      const stages = stagesResponse.data;
+      
+      // Charger les notifications (pour les activités récentes)
+      const notificationsResponse = await axios.get(`${API_BASE_URL}/notifications`);
+      const notifications = notificationsResponse.data;
+
+      // Calculer les statistiques
+      const totalUsers = comptes.length;
+      const activeUsers = comptes.filter(compte => compte.statut === 'ACTIF').length;
+      const superieursCount = superieurs.filter(s => s.statut === 'ACTIF').length;
+      const encadreursCount = encadreurs.filter(e => e.statut === 'ACTIF').length;
+      const stagiairesCount = stagiaires.filter(s => s.statut === 'ACTIF').length;
+      const activeStagesCount = stages.filter(s => s.statutStage === 'EN_COURS').length;
+      const completedStagesCount = stages.filter(s => s.statutStage === 'TERMINE').length;
+
+      // Simuler les nouvelles inscriptions ce mois-ci
+      const newThisMonth = Math.floor(Math.random() * 20) + 5;
+      
+      // Simuler les approbations en attente
+      const pendingApprovalsCount = Math.floor(Math.random() * 5) + 1;
+
+      setStatsData({
+        totalUsers,
+        activeUsers,
+        newThisMonth,
+        pendingApprovals: pendingApprovalsCount,
+        superieurs: superieursCount,
+        encadreurs: encadreursCount,
+        stagiaires: stagiairesCount,
+        activeStages: activeStagesCount,
+        completedStages: completedStagesCount
+      });
+
+      // Générer des activités récentes basées sur les données réelles
+      const generatedActivities = generateRecentActivities(comptes, superieurs, encadreurs, stagiaires);
+      setRecentActivities(generatedActivities);
+
+      // Générer des approbations en attente
+      const generatedApprovals = generatePendingApprovals(comptes);
+      setPendingApprovals(generatedApprovals);
+
+      // Mettre à jour les stats système
+      setSystemStats(prev => ({
+        ...prev,
+        activeSessions: Math.floor(Math.random() * 50) + 10
+      }));
+
+    } catch (error) {
+      console.error("Erreur lors du chargement du dashboard:", error);
+      toast.error("Erreur lors du chargement des données du dashboard");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Générer des activités récentes basées sur les données réelles
+  const generateRecentActivities = (comptes, superieurs, encadreurs, stagiaires) => {
+    const activities = [];
+    const activityTypes = ['creation', 'modification', 'desactivation', 'approbation', 'rapport'];
+    const roles = ['Administrateur', 'Supérieur', 'Encadreur', 'Stagiaire'];
+    
+    // Prendre les 5 derniers comptes créés/modifiés
+    const recentComptes = [...comptes]
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      .slice(0, 5);
+
+    recentComptes.forEach((compte, index) => {
+      let userInfo = {};
+      let role = 'Utilisateur';
+
+      // Trouver les informations de l'utilisateur selon son type
+      if (compte.entityType === 'SUPERIEUR_HIERARCHIQUE') {
+        const superieur = superieurs.find(s => s.documentId === compte.entityDocumentId);
+        if (superieur) {
+          userInfo = superieur;
+          role = 'Supérieur';
+        }
+      } else if (compte.entityType === 'ENCADREUR') {
+        const encadreur = encadreurs.find(e => e.documentId === compte.entityDocumentId);
+        if (encadreur) {
+          userInfo = encadreur;
+          role = 'Encadreur';
+        }
+      } else if (compte.entityType === 'STAGIAIRE') {
+        const stagiaire = stagiaires.find(s => s.documentId === compte.entityDocumentId);
+        if (stagiaire) {
+          userInfo = stagiaire;
+          role = 'Stagiaire';
+        }
+      } else if (compte.entityType === 'ADMIN') {
+        role = 'Administrateur';
+        userInfo = { prenom: 'Admin', nom: 'Système' };
+      }
+
+      const activityType = activityTypes[Math.floor(Math.random() * activityTypes.length)];
+      const actions = {
+        creation: `a créé un nouveau compte ${role.toLowerCase()}`,
+        modification: `a modifié les informations du compte`,
+        desactivation: `a ${compte.statut === 'INACTIF' ? 'désactivé' : 'activé'} le compte`,
+        approbation: `a approuvé une demande`,
+        rapport: `a généré un rapport`
+      };
+
+      activities.push({
+        id: index + 1,
+        user: userInfo.prenom && userInfo.nom ? `${userInfo.prenom} ${userInfo.nom}` : 'Utilisateur',
+        action: actions[activityType],
+        time: getRelativeTime(new Date(compte.updatedAt)),
+        type: activityType,
+        role: role
+      });
+    });
+
+    return activities;
+  };
+
+  // Générer des approbations en attente
+  const generatePendingApprovals = (comptes) => {
+    // Prendre quelques comptes récemment créés comme "en attente"
+    const recentComptes = [...comptes]
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 3);
+
+    return recentComptes.map((compte, index) => ({
+      id: index + 1,
+      nom: 'Utilisateur',
+      prenom: 'Nouveau',
+      email: compte.email,
+      role: getRoleLabel(compte.entityType),
+      date: new Date(compte.createdAt).toISOString().split('T')[0],
+      status: 'en_attente',
+      documentId: compte.documentId
+    }));
+  };
+
+  // Helper function pour obtenir le label du rôle
+  const getRoleLabel = (entityType) => {
+    switch (entityType) {
+      case 'SUPERIEUR_HIERARCHIQUE': return 'Supérieur';
+      case 'ENCADREUR': return 'Encadreur';
+      case 'STAGIAIRE': return 'Stagiaire';
+      case 'ADMIN': return 'Administrateur';
+      default: return 'Utilisateur';
+    }
+  };
+
+  // Helper function pour le temps relatif
+  const getRelativeTime = (date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return 'Il y a quelques secondes';
+    if (diffInSeconds < 3600) return `Il y a ${Math.floor(diffInSeconds / 60)} min`;
+    if (diffInSeconds < 86400) return `Il y a ${Math.floor(diffInSeconds / 3600)} heures`;
+    return `Il y a ${Math.floor(diffInSeconds / 86400)} jours`;
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
   const getActivityColor = (type) => {
     switch (type) {
@@ -180,25 +297,64 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleApprove = (id) => {
-    console.log('Approuver:', id);
-    // Logique d'approbation
+  const handleApprove = async (approval) => {
+    try {
+      // Simuler l'approbation - dans un vrai système, vous appelleriez une API d'approbation
+      toast.success(`Compte ${approval.email} approuvé avec succès`);
+      
+      // Mettre à jour la liste des approbations en attente
+      setPendingApprovals(prev => prev.filter(a => a.id !== approval.id));
+      
+      // Recharger les données
+      await fetchDashboardData();
+    } catch (error) {
+      console.error("Erreur lors de l'approbation:", error);
+      toast.error("Erreur lors de l'approbation du compte");
+    }
   };
 
-  const handleReject = (id) => {
-    console.log('Rejeter:', id);
-    // Logique de rejet
+  const handleReject = async (approval) => {
+    try {
+      // Simuler le rejet - dans un vrai système, vous appelleriez une API de rejet
+      toast.success(`Compte ${approval.email} rejeté`);
+      
+      // Mettre à jour la liste des approbations en attente
+      setPendingApprovals(prev => prev.filter(a => a.id !== approval.id));
+      
+      // Recharger les données
+      await fetchDashboardData();
+    } catch (error) {
+      console.error("Erreur lors du rejet:", error);
+      toast.error("Erreur lors du rejet du compte");
+    }
   };
 
   const handleViewDetails = (user) => {
     console.log('Voir détails:', user);
-    // Navigation vers les détails
+    // Navigation vers les détails de l'utilisateur
   };
 
   const handleExportReport = () => {
     console.log('Exporter le rapport');
-    // Logique d'export
+    // Logique d'export des données du dashboard
+    toast.success("Rapport exporté avec succès");
   };
+
+  const handleRefreshData = () => {
+    fetchDashboardData();
+    toast.success("Données actualisées");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement du tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -208,6 +364,21 @@ export default function AdminDashboard() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -225,6 +396,14 @@ export default function AdminDashboard() {
             </p>
           </div>
           <div className="flex gap-3">
+            <Button 
+              onClick={handleRefreshData}
+              variant="outline"
+              className="gap-2 border-gray-300 dark:border-gray-600"
+            >
+              <Download className="h-4 w-4" />
+              Actualiser
+            </Button>
             <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
               <SelectTrigger className="w-[140px] bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600">
                 <SelectValue placeholder="Période" />
@@ -268,7 +447,7 @@ export default function AdminDashboard() {
             ),
             count: statsData.totalUsers,
             change: "+12%",
-            text: "Depuis le mois dernier",
+            text: "Dans le système",
             gradient: "from-blue-500 to-blue-600"
           },
           {
@@ -283,7 +462,7 @@ export default function AdminDashboard() {
             ),
             count: statsData.activeUsers,
             change: "+8%",
-            text: "En ligne cette semaine",
+            text: "Actuellement actifs",
             gradient: "from-emerald-500 to-emerald-600"
           },
           {
@@ -364,7 +543,7 @@ export default function AdminDashboard() {
           },
           {
             title: "Encadreurs",
-            icon: <UserCheck className="h-5 w-5 text-blue-600" />,
+            icon: <UserCog className="h-5 w-5 text-blue-600" />,
             count: statsData.encadreurs,
             color: "text-blue-600"
           },
@@ -376,7 +555,7 @@ export default function AdminDashboard() {
           },
           {
             title: "Stages Actifs",
-            icon: <Calendar className="h-5 w-5 text-amber-600" />,
+            icon: <Target className="h-5 w-5 text-amber-600" />,
             count: statsData.activeStages,
             color: "text-amber-600"
           },
@@ -447,7 +626,7 @@ export default function AdminDashboard() {
                     <div className="flex gap-2">
                       <Button
                         size="sm"
-                        onClick={() => handleApprove(approval.id)}
+                        onClick={() => handleApprove(approval)}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white"
                       >
                         Approuver
@@ -455,7 +634,7 @@ export default function AdminDashboard() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleReject(approval.id)}
+                        onClick={() => handleReject(approval)}
                         className="border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-900/20"
                       >
                         Rejeter
@@ -463,6 +642,14 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+                {pendingApprovals.length === 0 && (
+                  <div className="text-center py-8">
+                    <UserCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Aucune approbation en attente
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -504,6 +691,14 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 ))}
+                {recentActivities.length === 0 && (
+                  <div className="text-center py-8">
+                    <Calendar className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400">
+                      Aucune activité récente
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

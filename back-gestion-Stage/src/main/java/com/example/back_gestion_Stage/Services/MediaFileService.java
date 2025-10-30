@@ -22,7 +22,6 @@ public class MediaFileService extends BaseService<MediaFile, MediaFileDTO> {
     @Autowired
     private MediaFileRepository mediaFileRepository;
 
-    // Chemin de stockage des fichiers - à configurer dans application.properties
     private final String UPLOAD_DIR = "uploads/";
 
     @Override
@@ -72,6 +71,23 @@ public class MediaFileService extends BaseService<MediaFile, MediaFileDTO> {
         return entity;
     }
 
+    // NOUVELLE MÉTHODE POUR LA MISE À JOUR
+    @Override
+    protected void updateEntityFromDto(MediaFile entity, MediaFileDTO dto) {
+        if (dto.getName() != null) entity.setName(dto.getName());
+        if (dto.getAlternativeText() != null) entity.setAlternativeText(dto.getAlternativeText());
+        if (dto.getCaption() != null) entity.setCaption(dto.getCaption());
+        if (dto.getWidth() != null) entity.setWidth(dto.getWidth());
+        if (dto.getHeight() != null) entity.setHeight(dto.getHeight());
+        if (dto.getExt() != null) entity.setExt(dto.getExt());
+        if (dto.getMime() != null) entity.setMime(dto.getMime());
+        if (dto.getSize() != null) entity.setSize(dto.getSize());
+        if (dto.getUrl() != null) entity.setUrl(dto.getUrl());
+        if (dto.getProvider() != null) entity.setProvider(dto.getProvider());
+        if (dto.getThumbnailUrl() != null) entity.setThumbnailUrl(dto.getThumbnailUrl());
+        if (dto.getMediumUrl() != null) entity.setMediumUrl(dto.getMediumUrl());
+        // Ne pas mettre à jour : id, documentId, createdAt, updatedAt
+    }
     @Override
     public Optional<MediaFileDTO> findByDocumentId(String documentId) {
         return mediaFileRepository.findByDocumentId(documentId)

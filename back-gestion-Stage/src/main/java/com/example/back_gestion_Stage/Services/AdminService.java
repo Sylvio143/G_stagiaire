@@ -31,6 +31,7 @@ public class AdminService extends BaseService<Admin, AdminDTO> {
         dto.setTelephone(entity.getTelephone());
         dto.setCin(entity.getCin());
         dto.setFonction(entity.getFonction());
+        dto.setStatut(entity.getStatut());
         return dto;
     }
 
@@ -45,7 +46,21 @@ public class AdminService extends BaseService<Admin, AdminDTO> {
         entity.setTelephone(dto.getTelephone());
         entity.setCin(dto.getCin());
         entity.setFonction(dto.getFonction());
+        entity.setStatut(dto.getStatut());
         return entity;
+    }
+
+    // NOUVELLE MÉTHODE POUR LA MISE À JOUR
+    @Override
+    protected void updateEntityFromDto(Admin entity, AdminDTO dto) {
+        if (dto.getNom() != null) entity.setNom(dto.getNom());
+        if (dto.getPrenom() != null) entity.setPrenom(dto.getPrenom());
+        if (dto.getEmail() != null) entity.setEmail(dto.getEmail());
+        if (dto.getTelephone() != null) entity.setTelephone(dto.getTelephone());
+        if (dto.getCin() != null) entity.setCin(dto.getCin());
+        if (dto.getFonction() != null) entity.setFonction(dto.getFonction());
+        if (dto.getStatut() != null) entity.setStatut(dto.getStatut());
+        // Ne pas mettre à jour : id, documentId, createdAt, updatedAt
     }
 
     @Override

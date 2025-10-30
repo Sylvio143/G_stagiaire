@@ -45,7 +45,6 @@ public class TacheService extends BaseService<Tache, TacheDTO> {
         dto.setPrioriteLabel(entity.getPrioriteLabel());
         dto.setEnRetard(entity.isEnRetard());
         
-        // Charger la relation avec le stage
         if (entity.getStage() != null) {
             dto.setStageDocumentId(entity.getStage().getDocumentId());
         }
@@ -65,7 +64,6 @@ public class TacheService extends BaseService<Tache, TacheDTO> {
         entity.setStatut(dto.getStatut());
         entity.setPriorite(dto.getPriorite());
         
-        // Établir la relation avec le stage
         if (dto.getStageDocumentId() != null) {
             stageRepository.findByDocumentId(dto.getStageDocumentId())
                 .ifPresent(entity::setStage);
@@ -74,6 +72,17 @@ public class TacheService extends BaseService<Tache, TacheDTO> {
         return entity;
     }
 
+    // NOUVELLE MÉTHODE POUR LA MISE À JOUR
+    @Override
+    protected void updateEntityFromDto(Tache entity, TacheDTO dto) {
+        if (dto.getTitre() != null) entity.setTitre(dto.getTitre());
+        if (dto.getDescription() != null) entity.setDescription(dto.getDescription());
+        if (dto.getDateDebut() != null) entity.setDateDebut(dto.getDateDebut());
+        if (dto.getDateFin() != null) entity.setDateFin(dto.getDateFin());
+        if (dto.getStatut() != null) entity.setStatut(dto.getStatut());
+        if (dto.getPriorite() != null) entity.setPriorite(dto.getPriorite());
+        // Ne pas mettre à jour : id, documentId, createdAt, updatedAt, stage
+    }
     // Méthode pour créer une tâche avec relations
     @Transactional
     public TacheDTO createTacheWithRelations(TacheDTO tacheDTO) {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   User,
@@ -19,7 +19,9 @@ import {
   Trash2,
   Settings,
   Eye,
-  EyeOff
+  EyeOff,
+  IdCard,
+  Briefcase
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +31,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -50,36 +54,6 @@ const cardVariants = {
       ease: "easeOut",
     },
   },
-};
-
-// Données de démonstration pour l'encadreur
-const donneesEncadreur = {
-  id: 1,
-  nom: "Dubois",
-  prenom: "Michel",
-  email: "michel.dubois@entreprise.com",
-  telephone: "+33 6 12 34 56 78",
-  poste: "Responsable Encadrement Stages",
-  service: "Ressources Humaines",
-  entreprise: "TechInnov Solutions",
-  adresse: "123 Avenue des Champs-Élysées",
-  ville: "Paris",
-  codePostal: "75008",
-  pays: "France",
-  dateEmbauche: "2020-03-15",
-  specialites: ["Développement Web", "Data Science", "Design UX/UI"],
-  bio: "Responsable de l'encadrement des stagiaires avec plus de 5 ans d'expérience dans le suivi pédagogique et professionnel.",
-  photo: null,
-  notifications: {
-    email: true,
-    push: true,
-    rappels: true,
-    nouveautes: false
-  },
-  securite: {
-    doubleAuth: false,
-    derniereConnexion: "2024-12-10T14:30:00"
-  }
 };
 
 // Composant Switch personnalisé
@@ -119,8 +93,9 @@ const CustomSwitch = ({ checked, onCheckedChange, id, label, description }) => (
 );
 
 export default function AdminParametre() {
-  const [encadreur, setEncadreur] = useState(donneesEncadreur);
+  const [admin, setAdmin] = useState(null);
   const [modification, setModification] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [changementMotPasse, setChangementMotPasse] = useState({
     actuel: "",
     nouveau: "",
@@ -132,81 +107,144 @@ export default function AdminParametre() {
     confirmation: false
   });
 
+  // Configuration Axios
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les données de l'admin
+  const fetchAdminData = async () => {
+    try {
+      setLoading(true);
+      // Récupérer le premier admin (vous devrez adapter selon votre auth)
+      const response = await axios.get(`${API_BASE_URL}/admins`);
+      if (response.data && response.data.length > 0) {
+        setAdmin(response.data[0]);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des données admin:", error);
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAdminData();
+  }, []);
+
   const handleInputChange = (field, value) => {
-    setEncadreur(prev => ({
+    setAdmin(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const handleSpecialiteChange = (index, value) => {
-    const nouvellesSpecialites = [...encadreur.specialites];
-    nouvellesSpecialites[index] = value;
-    setEncadreur(prev => ({
-      ...prev,
-      specialites: nouvellesSpecialites
-    }));
+  const handleSauvegarder = async () => {
+    try {
+      if (!admin) return;
+
+      await axios.put(`${API_BASE_URL}/admins/${admin.documentId}`, {
+        id: admin.id,
+        nom: admin.nom,
+        prenom: admin.prenom,
+        email: admin.email,
+        telephone: admin.telephone,
+        cin: admin.cin,
+        fonction: admin.fonction,
+        statut: admin.statut
+      });
+
+      toast.success("Profil modifié avec succès");
+      setModification(false);
+      await fetchAdminData(); // Recharger les données
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde:", error);
+      toast.error("Erreur lors de la modification du profil");
+    }
   };
 
-  const ajouterSpecialite = () => {
-    setEncadreur(prev => ({
-      ...prev,
-      specialites: [...prev.specialites, ""]
-    }));
-  };
+  const handleChangerMotPasse = async () => {
+    try {
+      if (!admin) return;
 
-  const supprimerSpecialite = (index) => {
-    setEncadreur(prev => ({
-      ...prev,
-      specialites: prev.specialites.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleNotificationChange = (type, value) => {
-    setEncadreur(prev => ({
-      ...prev,
-      notifications: {
-        ...prev.notifications,
-        [type]: value
+      if (changementMotPasse.nouveau !== changementMotPasse.confirmation) {
+        toast.error("Les mots de passe ne correspondent pas");
+        return;
       }
-    }));
-  };
 
-  const handleSauvegarder = () => {
-    console.log('Sauvegarde des modifications:', encadreur);
-    setModification(false);
-    // Logique de sauvegarde vers l'API
-  };
+      if (changementMotPasse.nouveau.length < 6) {
+        toast.error("Le mot de passe doit contenir au moins 6 caractères");
+        return;
+      }
 
-  const handleChangerMotPasse = () => {
-    console.log('Changement de mot de passe:', changementMotPasse);
-    setChangementMotPasse({
-      actuel: "",
-      nouveau: "",
-      confirmation: ""
-    });
-    // Logique de changement de mot de passe
+      // Utiliser l'endpoint de changement de mot de passe des comptes
+      await axios.put(`${API_BASE_URL}/comptes-utilisateurs/${admin.documentId}/password`, {
+        newPassword: changementMotPasse.nouveau
+      });
+
+      toast.success("Mot de passe modifié avec succès");
+      setChangementMotPasse({
+        actuel: "",
+        nouveau: "",
+        confirmation: ""
+      });
+    } catch (error) {
+      console.error("Erreur lors du changement de mot de passe:", error);
+      toast.error("Erreur lors du changement de mot de passe");
+    }
   };
 
   const handleExportDonnees = () => {
     console.log('Export des données');
+    toast.success("Export des données en cours...");
     // Logique d'export des données
   };
 
-  const handleSupprimerCompte = () => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.")) {
-      console.log('Suppression du compte');
-      // Logique de suppression du compte
+  const handleSupprimerCompte = async () => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.")) {
+      return;
+    }
+
+    try {
+      if (!admin) return;
+
+      await axios.delete(`${API_BASE_URL}/admins/${admin.documentId}`);
+      toast.success("Compte supprimé avec succès");
+      // Redirection vers la page de login ou autre
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error("Erreur lors de la suppression du compte");
     }
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("fr-FR", {
       day: "numeric",
       month: "long",
       year: "numeric"
     });
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des paramètres...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!admin) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Aucune donnée admin trouvée</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -216,6 +254,21 @@ export default function AdminParametre() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -226,7 +279,7 @@ export default function AdminParametre() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Paramètres du Compte
+              Paramètres du Compte Administrateur
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-lg">
               Gérez vos informations personnelles et préférences
@@ -237,7 +290,10 @@ export default function AdminParametre() {
               <>
                 <Button
                   variant="outline"
-                  onClick={() => setModification(false)}
+                  onClick={() => {
+                    setModification(false);
+                    fetchAdminData(); // Recharger les données originales
+                  }}
                   className="border-gray-300 dark:border-gray-600"
                 >
                   Annuler
@@ -301,7 +357,7 @@ export default function AdminParametre() {
                       <div className="relative">
                         <Avatar className="h-24 w-24 border-4 border-white/20 shadow-lg">
                           <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xl">
-                            {encadreur.prenom[0]}{encadreur.nom[0]}
+                            {admin.prenom?.[0]}{admin.nom?.[0]}
                           </AvatarFallback>
                         </Avatar>
                         {modification && (
@@ -313,13 +369,13 @@ export default function AdminParametre() {
                       
                       <div>
                         <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                          {encadreur.prenom} {encadreur.nom}
+                          {admin.prenom} {admin.nom}
                         </h3>
                         <p className="text-gray-600 dark:text-gray-400">
-                          {encadreur.poste}
+                          {admin.fonction}
                         </p>
-                        <Badge className="mt-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                          Encadreur
+                        <Badge className="mt-2 bg-gradient-to-r from-red-500 to-pink-500 text-white">
+                          Administrateur
                         </Badge>
                       </div>
                     </div>
@@ -327,31 +383,31 @@ export default function AdminParametre() {
                 </Card>
               </motion.div>
 
-              {/* Informations de l'entreprise */}
+              {/* Informations système */}
               <motion.div variants={cardVariants}>
                 <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                      <Building className="h-5 w-5" />
-                      Entreprise
+                      <Briefcase className="h-5 w-5" />
+                      Informations Système
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {encadreur.entreprise}
+                        ID: {admin.documentId}
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {encadreur.service}
+                        Identifiant unique
                       </p>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>{encadreur.ville}, {encadreur.pays}</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                       <Calendar className="h-4 w-4" />
-                      <span>Depuis {formatDate(encadreur.dateEmbauche)}</span>
+                      <span>Créé le {formatDate(admin.createdAt)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Calendar className="h-4 w-4" />
+                      <span>Modifié le {formatDate(admin.updatedAt)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -375,19 +431,19 @@ export default function AdminParametre() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="prenom">Prénom</Label>
+                        <Label htmlFor="prenom">Prénom *</Label>
                         <Input
                           id="prenom"
-                          value={encadreur.prenom}
+                          value={admin.prenom || ""}
                           onChange={(e) => handleInputChange('prenom', e.target.value)}
                           disabled={!modification}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="nom">Nom</Label>
+                        <Label htmlFor="nom">Nom *</Label>
                         <Input
                           id="nom"
-                          value={encadreur.nom}
+                          value={admin.nom || ""}
                           onChange={(e) => handleInputChange('nom', e.target.value)}
                           disabled={!modification}
                         />
@@ -396,148 +452,67 @@ export default function AdminParametre() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email">Email *</Label>
                         <Input
                           id="email"
                           type="email"
-                          value={encadreur.email}
+                          value={admin.email || ""}
                           onChange={(e) => handleInputChange('email', e.target.value)}
                           disabled={!modification}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="telephone">Téléphone</Label>
+                        <Label htmlFor="telephone">Téléphone *</Label>
                         <Input
                           id="telephone"
-                          value={encadreur.telephone}
+                          value={admin.telephone || ""}
                           onChange={(e) => handleInputChange('telephone', e.target.value)}
                           disabled={!modification}
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="poste">Poste</Label>
-                      <Input
-                        id="poste"
-                        value={encadreur.poste}
-                        onChange={(e) => handleInputChange('poste', e.target.value)}
-                        disabled={!modification}
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cin">CIN *</Label>
+                        <Input
+                          id="cin"
+                          value={admin.cin || ""}
+                          onChange={(e) => handleInputChange('cin', e.target.value)}
+                          disabled={!modification}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fonction">Fonction *</Label>
+                        <Input
+                          id="fonction"
+                          value={admin.fonction || ""}
+                          onChange={(e) => handleInputChange('fonction', e.target.value)}
+                          disabled={!modification}
+                        />
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
 
-              {/* Adresse */}
-              <motion.div variants={cardVariants}>
-                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                      <MapPin className="h-5 w-5" />
-                      Adresse
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="adresse">Adresse</Label>
-                      <Input
-                        id="adresse"
-                        value={encadreur.adresse}
-                        onChange={(e) => handleInputChange('adresse', e.target.value)}
-                        disabled={!modification}
-                      />
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="ville">Ville</Label>
-                        <Input
-                          id="ville"
-                          value={encadreur.ville}
-                          onChange={(e) => handleInputChange('ville', e.target.value)}
-                          disabled={!modification}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="codePostal">Code Postal</Label>
-                        <Input
-                          id="codePostal"
-                          value={encadreur.codePostal}
-                          onChange={(e) => handleInputChange('codePostal', e.target.value)}
-                          disabled={!modification}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="pays">Pays</Label>
-                        <Input
-                          id="pays"
-                          value={encadreur.pays}
-                          onChange={(e) => handleInputChange('pays', e.target.value)}
-                          disabled={!modification}
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-
-              {/* Spécialités et Bio */}
-              <motion.div variants={cardVariants}>
-                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
-                  <CardHeader>
-                    <CardTitle>Spécialités et Description</CardTitle>
-                    <CardDescription>
-                      Vos domaines d'expertise et présentation personnelle
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Spécialités</Label>
-                      <div className="space-y-2">
-                        {encadreur.specialites.map((specialite, index) => (
-                          <div key={index} className="flex gap-2">
-                            <Input
-                              value={specialite}
-                              onChange={(e) => handleSpecialiteChange(index, e.target.value)}
-                              disabled={!modification}
-                              placeholder="Domaine d'expertise"
-                            />
-                            {modification && encadreur.specialites.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 border-red-300"
-                                onClick={() => supprimerSpecialite(index)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
+                      <Label htmlFor="statut">Statut</Label>
+                      <div className="flex items-center gap-4">
+                        <Badge className={admin.statut === 'ACTIF' 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : 'bg-red-100 text-red-700'
+                        }>
+                          {admin.statut === 'ACTIF' ? 'Actif' : 'Inactif'}
+                        </Badge>
                         {modification && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={ajouterSpecialite}
-                            className="w-full border-gray-300 dark:border-gray-600"
+                          <select
+                            value={admin.statut}
+                            onChange={(e) => handleInputChange('statut', e.target.value)}
+                            className="px-3 py-1 border rounded-md"
                           >
-                            + Ajouter une spécialité
-                          </Button>
+                            <option value="ACTIF">Actif</option>
+                            <option value="INACTIF">Inactif</option>
+                          </select>
                         )}
                       </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Biographie</Label>
-                      <Textarea
-                        id="bio"
-                        value={encadreur.bio}
-                        onChange={(e) => handleInputChange('bio', e.target.value)}
-                        disabled={!modification}
-                        rows={4}
-                        placeholder="Présentez-vous et vos expériences..."
-                      />
                     </div>
                   </CardContent>
                 </Card>
@@ -568,32 +543,32 @@ export default function AdminParametre() {
                 <CardContent className="space-y-6">
                   <CustomSwitch
                     id="notifications-email"
-                    checked={encadreur.notifications.email}
-                    onCheckedChange={(checked) => handleNotificationChange('email', checked)}
+                    checked={true}
+                    onCheckedChange={() => {}}
                     label="Notifications par email"
                     description="Recevoir les notifications importantes par email"
                   />
 
                   <CustomSwitch
                     id="notifications-push"
-                    checked={encadreur.notifications.push}
-                    onCheckedChange={(checked) => handleNotificationChange('push', checked)}
+                    checked={true}
+                    onCheckedChange={() => {}}
                     label="Notifications push"
                     description="Notifications en temps réel sur la plateforme"
                   />
 
                   <CustomSwitch
                     id="notifications-rappels"
-                    checked={encadreur.notifications.rappels}
-                    onCheckedChange={(checked) => handleNotificationChange('rappels', checked)}
+                    checked={true}
+                    onCheckedChange={() => {}}
                     label="Rappels automatiques"
-                    description="Rappels pour les échéances et entretiens"
+                    description="Rappels pour les échéances importantes"
                   />
 
                   <CustomSwitch
                     id="notifications-nouveautes"
-                    checked={encadreur.notifications.nouveautes}
-                    onCheckedChange={(checked) => handleNotificationChange('nouveautes', checked)}
+                    checked={false}
+                    onCheckedChange={() => {}}
                     label="Nouvelles fonctionnalités"
                     description="Être informé des nouvelles fonctionnalités"
                   />
@@ -663,7 +638,7 @@ export default function AdminParametre() {
                           ...prev,
                           nouveau: e.target.value
                         }))}
-                        placeholder="Nouveau mot de passe"
+                        placeholder="Nouveau mot de passe (min. 6 caractères)"
                       />
                       <Button
                         type="button"
@@ -711,6 +686,7 @@ export default function AdminParametre() {
                   <Button
                     onClick={handleChangerMotPasse}
                     className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    disabled={!changementMotPasse.nouveau || !changementMotPasse.confirmation}
                   >
                     <Lock className="h-4 w-4" />
                     Changer le mot de passe
@@ -719,7 +695,7 @@ export default function AdminParametre() {
               </Card>
             </motion.div>
 
-            {/* Authentification à deux facteurs */}
+            {/* Informations de sécurité */}
             <motion.div variants={cardVariants}>
               <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
                 <CardHeader>
@@ -729,30 +705,18 @@ export default function AdminParametre() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        Authentification à deux facteurs
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Ajoutez une couche de sécurité supplémentaire à votre compte
-                      </p>
-                    </div>
-                    <CustomSwitch
-                      id="double-auth"
-                      checked={encadreur.securite.doubleAuth}
-                      onCheckedChange={(checked) => setEncadreur(prev => ({
-                        ...prev,
-                        securite: { ...prev.securite, doubleAuth: checked }
-                      }))}
-                      label=""
-                      description=""
-                    />
-                  </div>
-
                   <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <p className="text-sm text-blue-700 dark:text-blue-300">
-                      <strong>Dernière connexion :</strong> {formatDate(encadreur.securite.derniereConnexion)}
+                      <strong>Dernière connexion :</strong> {formatDate(admin.updatedAt)}
+                    </p>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      <strong>Statut du compte :</strong>{" "}
+                      <Badge className={admin.statut === 'ACTIF' 
+                        ? 'bg-emerald-100 text-emerald-700' 
+                        : 'bg-red-100 text-red-700'
+                      }>
+                        {admin.statut === 'ACTIF' ? 'Actif' : 'Inactif'}
+                      </Badge>
                     </p>
                   </div>
                 </CardContent>
@@ -812,7 +776,7 @@ export default function AdminParametre() {
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      La suppression de votre compte est définitive. Toutes vos données, y compris les informations sur les stagiaires et les rapports, seront supprimées.
+                      La suppression de votre compte est définitive. Toutes vos données seront supprimées de manière irréversible.
                     </p>
                     <Button
                       onClick={handleSupprimerCompte}

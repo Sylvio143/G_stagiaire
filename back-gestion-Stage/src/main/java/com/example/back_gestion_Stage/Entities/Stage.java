@@ -25,9 +25,10 @@ public class Stage extends BaseEntity {
     @Column(name = "date_fin", nullable = false)
     private LocalDate dateFin;
     
+    // CHANGEMENT: Renommer le champ pour éviter le conflit
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private StatutStage statut = StatutStage.EN_ATTENTE_VALIDATION;
+    @Column(name = "statut_stage", nullable = false)
+    private StatutStage statutStage = StatutStage.EN_ATTENTE_VALIDATION;
     
     // Relation directe avec l'encadreur
     @ManyToOne(fetch = FetchType.LAZY)
@@ -58,6 +59,19 @@ public class Stage extends BaseEntity {
         REFUSE,
         EN_COURS,
         TERMINE
+    }
+    
+    // CORRECTION: Mettre à jour les méthodes qui utilisaient statut
+    public boolean isEnCours() {
+        return this.statutStage == StatutStage.EN_COURS;
+    }
+    
+    public boolean isTermine() {
+        return this.statutStage == StatutStage.TERMINE;
+    }
+    
+    public boolean isEnAttenteValidation() {
+        return this.statutStage == StatutStage.EN_ATTENTE_VALIDATION;
     }
     
     // Méthode utilitaire pour ajouter un stagiaire

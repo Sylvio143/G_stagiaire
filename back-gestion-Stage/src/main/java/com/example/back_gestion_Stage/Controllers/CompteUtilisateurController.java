@@ -2,6 +2,7 @@ package com.example.back_gestion_Stage.Controllers;
 
 import com.example.back_gestion_Stage.DTOs.CompteUtilisateurDTO;
 import com.example.back_gestion_Stage.Entities.CompteUtilisateur;
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import com.example.back_gestion_Stage.Services.CompteUtilisateurService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,16 @@ public class CompteUtilisateurController {
 
     @GetMapping
     public ResponseEntity<List<CompteUtilisateurDTO>> getAllComptes() {
+        try {
+            List<CompteUtilisateurDTO> comptes = compteUtilisateurService.findAllActifs();
+            return ResponseEntity.ok(comptes);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/tous")
+    public ResponseEntity<List<CompteUtilisateurDTO>> getAllComptesWithInactifs() {
         try {
             List<CompteUtilisateurDTO> comptes = compteUtilisateurService.findAll();
             return ResponseEntity.ok(comptes);
@@ -57,6 +68,8 @@ public class CompteUtilisateurController {
                 return ResponseEntity.badRequest().body(null);
             }
 
+            // S'assurer que le statut est ACTIF par défaut
+            compteDTO.setStatut(StatutEntite.ACTIF);
             CompteUtilisateurDTO savedCompte = compteUtilisateurService.createCompteUtilisateur(compteDTO);
             return ResponseEntity.ok(savedCompte);
         } catch (RuntimeException e) {
@@ -131,6 +144,48 @@ public class CompteUtilisateurController {
         }
     }
 
+    // NOUVEAUX ENDPOINTS POUR LA GESTION DU STATUT
+    @PutMapping("/{documentId}/desactiver")
+    public ResponseEntity<CompteUtilisateurDTO> desactiverCompte(@PathVariable String documentId) {
+        try {
+            CompteUtilisateurDTO compte = compteUtilisateurService.desactiver(documentId);
+            return compte != null ? ResponseEntity.ok(compte) : ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PutMapping("/{documentId}/activer")
+    public ResponseEntity<CompteUtilisateurDTO> activerCompte(@PathVariable String documentId) {
+        try {
+            CompteUtilisateurDTO compte = compteUtilisateurService.activer(documentId);
+            return compte != null ? ResponseEntity.ok(compte) : ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/statut/{statut}")
+    public ResponseEntity<List<CompteUtilisateurDTO>> getComptesByStatut(@PathVariable StatutEntite statut) {
+        try {
+            List<CompteUtilisateurDTO> comptes = compteUtilisateurService.findByStatut(statut);
+            return ResponseEntity.ok(comptes);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/inactifs")
+    public ResponseEntity<List<CompteUtilisateurDTO>> getComptesInactifs() {
+        try {
+            List<CompteUtilisateurDTO> comptes = compteUtilisateurService.findByStatut(StatutEntite.INACTIF);
+            return ResponseEntity.ok(comptes);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // ENDPOINTS EXISTANTS
     @GetMapping("/type/{typeCompte}")
     public ResponseEntity<List<CompteUtilisateurDTO>> getComptesByType(@PathVariable CompteUtilisateur.TypeCompte typeCompte) {
         try {

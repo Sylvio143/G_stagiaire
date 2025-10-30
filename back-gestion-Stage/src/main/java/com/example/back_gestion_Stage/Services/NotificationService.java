@@ -53,6 +53,19 @@ public class NotificationService extends BaseService<Notification, NotificationD
         return entity;
     }
 
+    // NOUVELLE MÉTHODE POUR LA MISE À JOUR
+    @Override
+    protected void updateEntityFromDto(Notification entity, NotificationDTO dto) {
+        if (dto.getTitre() != null) entity.setTitre(dto.getTitre());
+        if (dto.getMessage() != null) entity.setMessage(dto.getMessage());
+        if (dto.getType() != null) entity.setType(dto.getType());
+        entity.setLue(dto.isLue());
+        if (dto.getDocumentIdReference() != null) entity.setDocumentIdReference(dto.getDocumentIdReference());
+        if (dto.getTypeReference() != null) entity.setTypeReference(dto.getTypeReference());
+        if (dto.getCompteUtilisateurDocumentId() != null) entity.setCompteUtilisateurDocumentId(dto.getCompteUtilisateurDocumentId());
+        // Ne pas mettre à jour : id, documentId, createdAt, updatedAt
+    }
+
     @Override
     public Optional<NotificationDTO> findByDocumentId(String documentId) {
         return notificationRepository.findByDocumentId(documentId)

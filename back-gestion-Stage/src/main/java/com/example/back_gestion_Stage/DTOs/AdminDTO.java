@@ -1,5 +1,6 @@
 package com.example.back_gestion_Stage.DTOs;
 
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -12,4 +13,5 @@ public class AdminDTO extends BaseDTO {
     private String telephone;
     private String cin;
     private String fonction = "Administrateur";
+    private StatutEntite statut;
 }

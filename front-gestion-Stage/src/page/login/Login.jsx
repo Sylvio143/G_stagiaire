@@ -151,9 +151,9 @@ const Login = () => {
         localStorage.setItem('token', userData.documentId);
         
         // Toast de succès avec durée plus longue
-        toast.success(`🎉 Bienvenue ${userData.email} ! Redirection en cours...`, {
+        toast.success(`Bienvenue ${userData.email} ! Redirection en cours...`, {
           duration: 3000,
-          position: 'top-center',
+          position: 'top-right',
           style: {
             background: '#10b981',
             color: 'white',
@@ -174,9 +174,9 @@ const Login = () => {
     } catch (error) {
       // Toasts d'erreur avec durée plus longue et meilleur style
       if (error.response?.status === 401) {
-        toast.error('❌ Email ou mot de passe incorrect', {
+        toast.error('Email ou mot de passe incorrect', {
           duration: 4000,
-          position: 'top-center',
+          position: 'top-right',
           style: {
             background: '#ef4444',
             color: 'white',
@@ -187,9 +187,9 @@ const Login = () => {
           },
         });
       } else if (error.response?.status === 404) {
-        toast.error('❌ Utilisateur non trouvé', {
+        toast.error('Utilisateur non trouvé', {
           duration: 4000,
-          position: 'top-center',
+          position: 'top-right',
           style: {
             background: '#f59e0b',
             color: 'white',
@@ -200,9 +200,9 @@ const Login = () => {
           },
         });
       } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network')) {
-        toast.error('🌐 Impossible de joindre le serveur. Vérifiez votre connexion.', {
+        toast.error('Impossible de joindre le serveur. Vérifiez votre connexion.', {
           duration: 5000,
-          position: 'top-center',
+          position: 'top-right',
           style: {
             background: '#6366f1',
             color: 'white',
@@ -213,9 +213,9 @@ const Login = () => {
           },
         });
       } else {
-        toast.error('⚠️ Erreur de connexion au serveur', {
+        toast.error('Erreur de connexion au serveur', {
           duration: 4000,
-          position: 'top-center',
+          position: 'top-right',
           style: {
             background: '#6b7280',
             color: 'white',
@@ -246,7 +246,7 @@ const Login = () => {
   return (
     <>
       <Toaster 
-        position="top-center"
+        position="top-right"
         toastOptions={{
           duration: 4000,
           style: {

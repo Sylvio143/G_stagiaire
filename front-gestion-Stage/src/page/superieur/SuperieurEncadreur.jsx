@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Users, 
@@ -35,6 +35,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -58,156 +60,123 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration pour les encadreurs
-const encadreursData = [
-  {
-    id: 1,
-    nom: "Dubois",
-    prenom: "Michel",
-    email: "michel.dubois@entreprise.com",
-    telephone: "+33 6 11 22 33 44",
-    departement: "Développement Web",
-    specialite: "React, Node.js, MongoDB",
-    dateEmbauche: "2020-03-15",
-    statut: "Actif",
-    nombreStagiaires: 3,
-    performance: 4.5,
-    ville: "Paris",
-    experience: "8 ans",
-    dernierEntretien: "2024-11-15",
-    competences: ["React", "Node.js", "TypeScript", "MongoDB", "AWS"],
-    notes: "Excellent encadreur, très pédagogue"
-  },
-  {
-    id: 2,
-    nom: "Martin",
-    prenom: "Sophie",
-    email: "sophie.martin@entreprise.com",
-    telephone: "+33 6 22 33 44 55",
-    departement: "Design UX/UI",
-    specialite: "Figma, Recherche Utilisateur, Prototypage",
-    dateEmbauche: "2021-06-10",
-    statut: "Actif",
-    nombreStagiaires: 2,
-    performance: 4.8,
-    ville: "Lyon",
-    experience: "6 ans",
-    dernierEntretien: "2024-10-20",
-    competences: ["Figma", "Adobe XD", "User Research", "Prototyping", "Design System"],
-    notes: "Très créative, excellente communication"
-  },
-  {
-    id: 3,
-    nom: "Bernard",
-    prenom: "Pierre",
-    email: "pierre.bernard@entreprise.com",
-    telephone: "+33 6 33 44 55 66",
-    departement: "Data Science",
-    specialite: "Python, Machine Learning, Analytics",
-    dateEmbauche: "2019-01-20",
-    statut: "Actif",
-    nombreStagiaires: 2,
-    performance: 4.2,
-    ville: "Marseille",
-    experience: "10 ans",
-    dernierEntretien: "2024-09-30",
-    competences: ["Python", "Pandas", "Scikit-learn", "SQL", "Data Visualization"],
-    notes: "Expert technique, bon mentor"
-  },
-  {
-    id: 4,
-    nom: "Moreau",
-    prenom: "Alice",
-    email: "alice.moreau@entreprise.com",
-    telephone: "+33 6 44 55 66 77",
-    departement: "Marketing Digital",
-    specialite: "SEO, Analytics, Campagnes Social Media",
-    dateEmbauche: "2022-02-28",
-    statut: "En congé",
-    nombreStagiaires: 1,
-    performance: 4.0,
-    ville: "Toulouse",
-    experience: "5 ans",
-    dernierEntretien: "2024-08-15",
-    competences: ["SEO", "Google Analytics", "Social Media", "Content Marketing", "Growth"],
-    notes: "En congé maternité jusqu'au 15/03/2025"
-  },
-  {
-    id: 5,
-    nom: "Leroy",
-    prenom: "Thomas",
-    email: "thomas.leroy@entreprise.com",
-    telephone: "+33 6 55 66 77 88",
-    departement: "Cybersécurité",
-    specialite: "Pentesting, Sécurité Réseau",
-    dateEmbauche: "2018-09-05",
-    statut: "Actif",
-    nombreStagiaires: 1,
-    performance: 4.7,
-    ville: "Lille",
-    experience: "12 ans",
-    dernierEntretien: "2024-11-10",
-    competences: ["Pentesting", "Network Security", "Cryptography", "SIEM", "Incident Response"],
-    notes: "Expert reconnu, très bon formateur"
-  },
-  {
-    id: 6,
-    nom: "Garcia",
-    prenom: "Lucas",
-    email: "lucas.garcia@entreprise.com",
-    telephone: "+33 6 66 77 88 99",
-    departement: "Mobile Development",
-    specialite: "React Native, Flutter",
-    dateEmbauche: "2021-11-12",
-    statut: "Actif",
-    nombreStagiaires: 2,
-    performance: 4.3,
-    ville: "Nantes",
-    experience: "7 ans",
-    dernierEntretien: "2024-10-05",
-    competences: ["React Native", "Flutter", "iOS", "Android", "Firebase"],
-    notes: "Dynamique, bon relationnel avec les stagiaires"
-  }
-];
-
 export default function SuperieurEncadreur() {
+  const [encadreurs, setEncadreurs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [filtreDepartement, setFiltreDepartement] = useState("tous");
   const [recherche, setRecherche] = useState("");
-  const [encadreurs] = useState(encadreursData);
+
+  // Configuration Axios
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les encadreurs sous la supervision du supérieur
+  const fetchEncadreurs = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer l'ID du supérieur connecté
+      const user = JSON.parse(localStorage.getItem("user"));
+      const superieurId = user?.entityDocumentId;
+      
+      if (!superieurId) {
+        toast.error("Impossible de récupérer les informations du supérieur");
+        return;
+      }
+
+      // Récupérer tous les encadreurs
+      const response = await axios.get(`${API_BASE_URL}/encadreurs/tous`);
+      const tousLesEncadreurs = response.data;
+
+      // Filtrer pour ne garder que les encadreurs sous la supervision de ce supérieur
+      const encadreursFiltres = tousLesEncadreurs.filter(
+        encadreur => encadreur.superieurHierarchiqueDocumentId === superieurId
+      );
+
+      // Pour chaque encadreur, récupérer le nombre de stagiaires
+      const encadreursAvecStagiaires = await Promise.all(
+        encadreursFiltres.map(async (encadreur) => {
+          try {
+            const stagiairesResponse = await axios.get(`${API_BASE_URL}/stagiaires/encadreur/${encadreur.documentId}`);
+            const nombreStagiaires = stagiairesResponse.data.length;
+            
+            return {
+              ...encadreur,
+              nombreStagiaires: nombreStagiaires
+            };
+          } catch (error) {
+            console.error(`Erreur lors du chargement des stagiaires pour ${encadreur.prenom} ${encadreur.nom}:`, error);
+            return {
+              ...encadreur,
+              nombreStagiaires: 0
+            };
+          }
+        })
+      );
+
+      setEncadreurs(encadreursAvecStagiaires);
+    } catch (error) {
+      console.error("Erreur lors du chargement des encadreurs:", error);
+      toast.error("Erreur lors du chargement des encadreurs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEncadreurs();
+  }, []);
 
   const getStatutColor = (statut) => {
     switch (statut) {
-      case 'Actif': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
-      case 'En congé': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
-      case 'Inactif': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
+      case 'ACTIF': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'INACTIF': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     }
   };
 
+  const getStatutLabel = (statut) => {
+    switch (statut) {
+      case 'ACTIF': return 'Actif';
+      case 'INACTIF': return 'Inactif';
+      default: return statut;
+    }
+  };
+
+  // Calculer la performance (exemple basé sur le nombre de stagiaires)
+  const calculerPerformance = (encadreur) => {
+    // Logique simplifiée pour l'exemple
+    const baseScore = 4.0;
+    const bonusStagiaires = Math.min(encadreur.nombreStagiaires * 0.2, 1.0); // Max 1 point bonus
+    
+    return Math.min(baseScore + bonusStagiaires, 5.0).toFixed(1);
+  };
+
   const getPerformanceColor = (performance) => {
-    if (performance >= 4.5) return 'bg-emerald-100 text-emerald-700';
-    if (performance >= 4.0) return 'bg-blue-100 text-blue-700';
-    if (performance >= 3.5) return 'bg-amber-100 text-amber-700';
+    const perf = parseFloat(performance);
+    if (perf >= 4.5) return 'bg-emerald-100 text-emerald-700';
+    if (perf >= 4.0) return 'bg-blue-100 text-blue-700';
+    if (perf >= 3.5) return 'bg-amber-100 text-amber-700';
     return 'bg-red-100 text-red-700';
   };
 
   const getPerformanceText = (performance) => {
-    if (performance >= 4.5) return 'Excellent';
-    if (performance >= 4.0) return 'Très bon';
-    if (performance >= 3.5) return 'Bon';
+    const perf = parseFloat(performance);
+    if (perf >= 4.5) return 'Excellent';
+    if (perf >= 4.0) return 'Très bon';
+    if (perf >= 3.5) return 'Bon';
     return 'À améliorer';
   };
 
   // Liste unique des départements
-  const departements = [...new Set(encadreurs.map(e => e.departement))];
+  const departements = [...new Set(encadreurs.map(e => e.departement).filter(Boolean))];
 
   const encadreursFiltres = encadreurs.filter(encadreur => {
     const correspondRecherche = 
-      encadreur.nom.toLowerCase().includes(recherche.toLowerCase()) ||
-      encadreur.prenom.toLowerCase().includes(recherche.toLowerCase()) ||
-      encadreur.departement.toLowerCase().includes(recherche.toLowerCase()) ||
-      encadreur.specialite.toLowerCase().includes(recherche.toLowerCase());
+      encadreur.nom?.toLowerCase().includes(recherche.toLowerCase()) ||
+      encadreur.prenom?.toLowerCase().includes(recherche.toLowerCase()) ||
+      encadreur.departement?.toLowerCase().includes(recherche.toLowerCase()) ||
+      encadreur.specialite?.toLowerCase().includes(recherche.toLowerCase());
     
     const correspondStatut = filtreStatut === "tous" || encadreur.statut === filtreStatut;
     const correspondDepartement = filtreDepartement === "tous" || encadreur.departement === filtreDepartement;
@@ -215,29 +184,68 @@ export default function SuperieurEncadreur() {
     return correspondRecherche && correspondStatut && correspondDepartement;
   });
 
+  // Calcul des statistiques
+  const stats = {
+    total: encadreurs.length,
+    actifs: encadreurs.filter(e => e.statut === 'ACTIF').length,
+    inactifs: encadreurs.filter(e => e.statut === 'INACTIF').length,
+    totalStagiaires: encadreurs.reduce((acc, e) => acc + (e.nombreStagiaires || 0), 0),
+    departements: departements.length
+  };
+
   const handleVoirDetails = (encadreur) => {
     console.log('Voir détails encadreur:', encadreur);
     // Navigation vers la page de détails de l'encadreur
   };
 
   const handleContacterEncadreur = (encadreur) => {
-    console.log('Contacter encadreur:', encadreur);
-    // Logique de contact de l'encadreur
+    if (encadreur.email) {
+      window.location.href = `mailto:${encadreur.email}`;
+    } else {
+      toast.error("Aucun email disponible pour cet encadreur");
+    }
+  };
+
+  const handleAppelerEncadreur = (encadreur) => {
+    if (encadreur.telephone) {
+      window.location.href = `tel:${encadreur.telephone}`;
+    } else {
+      toast.error("Aucun numéro de téléphone disponible");
+    }
   };
 
   const handleExporterListe = () => {
     console.log('Exporter la liste des encadreurs');
+    toast.success("Export en cours...");
     // Logique d'export
   };
 
-  const stats = {
-    total: encadreurs.length,
-    actifs: encadreurs.filter(e => e.statut === 'Actif').length,
-    enConge: encadreurs.filter(e => e.statut === 'En congé').length,
-    totalStagiaires: encadreurs.reduce((acc, e) => acc + e.nombreStagiaires, 0),
-    moyennePerformance: Math.round(encadreurs.reduce((acc, e) => acc + e.performance, 0) / encadreurs.length * 10) / 10,
-    departements: departements.length
+  const handleActiverDesactiver = async (encadreur) => {
+    try {
+      if (encadreur.statut === 'ACTIF') {
+        await axios.put(`${API_BASE_URL}/encadreurs/${encadreur.documentId}/desactiver`);
+        toast.success("Encadreur désactivé avec succès");
+      } else {
+        await axios.put(`${API_BASE_URL}/encadreurs/${encadreur.documentId}/activer`);
+        toast.success("Encadreur activé avec succès");
+      }
+      await fetchEncadreurs(); // Recharger la liste
+    } catch (error) {
+      console.error("Erreur lors du changement de statut:", error);
+      toast.error("Erreur lors du changement de statut");
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des encadreurs...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -247,6 +255,21 @@ export default function SuperieurEncadreur() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -325,17 +348,17 @@ export default function SuperieurEncadreur() {
             gradient: "from-purple-500 to-purple-600"
           },
           {
-            title: "Performance Moyenne",
+            title: "Départements",
             icon: (
               <motion.div
                 animate={{ y: [-8, 0, -8] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
-                <TrendingUp className="h-6 w-6 text-amber-600" />
+                <Building className="h-6 w-6 text-amber-600" />
               </motion.div>
             ),
-            count: `${stats.moyennePerformance}/5`,
-            text: getPerformanceText(stats.moyennePerformance),
+            count: stats.departements,
+            text: "Départements différents",
             gradient: "from-amber-500 to-amber-600"
           },
         ].map((item, index) => (
@@ -390,9 +413,8 @@ export default function SuperieurEncadreur() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Tous les statuts</SelectItem>
-                      <SelectItem value="Actif">Actifs</SelectItem>
-                      <SelectItem value="En congé">En congé</SelectItem>
-                      <SelectItem value="Inactif">Inactifs</SelectItem>
+                      <SelectItem value="ACTIF">Actifs</SelectItem>
+                      <SelectItem value="INACTIF">Inactifs</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -401,7 +423,7 @@ export default function SuperieurEncadreur() {
                       <SelectValue placeholder="Département" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="tous">Tous les départements</SelectItem>
+                      <SelectItem value="tous">Tous départements</SelectItem>
                       {departements.map(departement => (
                         <SelectItem key={departement} value={departement}>
                           {departement}
@@ -428,172 +450,165 @@ export default function SuperieurEncadreur() {
         className="grid gap-6 md:grid-cols-2 xl:grid-cols-3"
       >
         <AnimatePresence>
-          {encadreursFiltres.map((encadreur) => (
-            <motion.div
-              key={encadreur.id}
-              variants={cardVariants}
-              layout
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              transition={{ duration: 0.3 }}
-            >
-              <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden h-full">
-                {/* En-tête avec statut et performance */}
-                <div className="p-6 pb-4">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-12 w-12 border-2 border-white/20">
-                        <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                          {encadreur.prenom[0]}{encadreur.nom[0]}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white">
-                          {encadreur.prenom} {encadreur.nom}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge className={`text-xs ${getStatutColor(encadreur.statut)}`}>
-                            {encadreur.statut}
-                          </Badge>
-                          <Badge className={`text-xs ${getPerformanceColor(encadreur.performance)}`}>
-                            <Star className="h-3 w-3 mr-1 fill-current" />
-                            {encadreur.performance}/5
-                          </Badge>
+          {encadreursFiltres.map((encadreur) => {
+            const performance = calculerPerformance(encadreur);
+
+            return (
+              <motion.div
+                key={encadreur.documentId}
+                variants={cardVariants}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden h-full">
+                  {/* En-tête avec statut et performance */}
+                  <div className="p-6 pb-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-12 w-12 border-2 border-white/20">
+                          <AvatarImage src={encadreur.photoUrl} />
+                          <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
+                            {encadreur.prenom?.[0]}{encadreur.nom?.[0]}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <h3 className="font-semibold text-gray-900 dark:text-white">
+                            {encadreur.prenom} {encadreur.nom}
+                          </h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge className={`text-xs ${getStatutColor(encadreur.statut)}`}>
+                              {getStatutLabel(encadreur.statut)}
+                            </Badge>
+                            <Badge className={`text-xs ${getPerformanceColor(performance)}`}>
+                              <Star className="h-3 w-3 mr-1 fill-current" />
+                              {performance}/5
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Informations principales */}
+                    <div className="space-y-3">
+                      {encadreur.departement && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Briefcase className="h-4 w-4" />
+                          <span className="font-medium">{encadreur.departement}</span>
+                        </div>
+                      )}
+                      
+                      {encadreur.specialite && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Award className="h-4 w-4" />
+                          <span>{encadreur.specialite}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <Mail className="h-4 w-4" />
+                        <span className="truncate">{encadreur.email}</span>
+                      </div>
+
+                      {encadreur.telephone && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Phone className="h-4 w-4" />
+                          <span>{encadreur.telephone}</span>
+                        </div>
+                      )}
+
+                      {encadreur.fonction && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Target className="h-4 w-4" />
+                          <span>{encadreur.fonction}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Statistiques de l'encadreur */}
+                  <div className="px-6 pb-4">
+                    <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-gray-900 dark:text-white">
+                          {encadreur.nombreStagiaires || 0}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          Stagiaires
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-lg font-bold text-gray-900 dark:text-white">
+                          {performance}/5
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {getPerformanceText(performance)}
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Informations principales */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Briefcase className="h-4 w-4" />
-                      <span className="font-medium">{encadreur.departement}</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Award className="h-4 w-4" />
-                      <span>{encadreur.specialite}</span>
-                    </div>
+                  {/* Actions */}
+                  <div className="p-6 pt-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-700/30">
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2 border-gray-300 dark:border-gray-600"
+                        onClick={() => handleVoirDetails(encadreur)}
+                      >
+                        <Eye className="h-4 w-4" />
+                        Détails
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 border-gray-300 dark:border-gray-600"
+                        onClick={() => handleContacterEncadreur(encadreur)}
+                        title="Contacter l'encadreur"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </Button>
 
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>{encadreur.ville}</span>
-                    </div>
+                      {encadreur.telephone && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2 border-gray-300 dark:border-gray-600"
+                          onClick={() => handleAppelerEncadreur(encadreur)}
+                          title="Téléphoner"
+                        >
+                          <Phone className="h-4 w-4" />
+                        </Button>
+                      )}
 
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Calendar className="h-4 w-4" />
-                      <span>Depuis {new Date(encadreur.dateEmbauche).getFullYear()}</span>
-                    </div>
-
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Target className="h-4 w-4" />
-                      <span>{encadreur.experience} d'expérience</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Statistiques de l'encadreur */}
-                <div className="px-6 pb-4">
-                  <div className="grid grid-cols-2 gap-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-gray-900 dark:text-white">
-                        {encadreur.nombreStagiaires}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Stagiaires
-                      </div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-gray-900 dark:text-white">
-                        {encadreur.performance}/5
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Performance
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Compétences */}
-                <div className="px-6 pb-4">
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Compétences</div>
-                  <div className="flex flex-wrap gap-1">
-                    {encadreur.competences.slice(0, 3).map((competence, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
-                        {competence}
-                      </Badge>
-                    ))}
-                    {encadreur.competences.length > 3 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{encadreur.competences.length - 3}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {encadreur.notes && (
-                  <div className="px-6 pb-4">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Notes</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
-                      {encadreur.notes}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className={`gap-2 ${
+                          encadreur.statut === 'ACTIF' 
+                            ? 'text-amber-600 border-amber-300 hover:text-amber-700' 
+                            : 'text-emerald-600 border-emerald-300 hover:text-emerald-700'
+                        }`}
+                        onClick={() => handleActiverDesactiver(encadreur)}
+                        title={encadreur.statut === 'ACTIF' ? 'Désactiver' : 'Activer'}
+                      >
+                        {encadreur.statut === 'ACTIF' ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                      </Button>
                     </div>
                   </div>
-                )}
-
-                {/* Dernier entretien */}
-                {encadreur.dernierEntretien && (
-                  <div className="px-6 pb-4">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Dernier entretien</div>
-                    <div className="text-sm text-gray-700 dark:text-gray-300">
-                      {new Date(encadreur.dernierEntretien).toLocaleDateString()}
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                <div className="p-6 pt-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-700/30">
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => handleVoirDetails(encadreur)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Détails
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => handleContacterEncadreur(encadreur)}
-                      title="Contacter l'encadreur"
-                    >
-                      <Mail className="h-4 w-4" />
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 border-gray-300 dark:border-gray-600"
-                      title="Téléphoner"
-                    >
-                      <Phone className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
+                </Card>
+              </motion.div>
+            );
+          })}
         </AnimatePresence>
       </motion.div>
 
       {/* Message si aucun résultat */}
-      {encadreursFiltres.length === 0 && (
+      {encadreursFiltres.length === 0 && !loading && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -602,10 +617,13 @@ export default function SuperieurEncadreur() {
         >
           <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">
-            Aucun encadreur trouvé
+            {encadreurs.length === 0 ? "Aucun encadreur dans votre équipe" : "Aucun encadreur trouvé"}
           </h3>
           <p className="text-gray-400 dark:text-gray-500">
-            Aucun encadreur ne correspond à vos critères de recherche.
+            {encadreurs.length === 0 
+              ? "Aucun encadreur n'est actuellement sous votre supervision." 
+              : "Aucun encadreur ne correspond à vos critères de recherche."
+            }
           </p>
         </motion.div>
       )}

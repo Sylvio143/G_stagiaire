@@ -1,6 +1,7 @@
 package com.example.back_gestion_Stage.Controllers;
 
 import com.example.back_gestion_Stage.DTOs.EncadreurDTO;
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import com.example.back_gestion_Stage.Services.EncadreurService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +19,12 @@ public class EncadreurController {
 
     @GetMapping
     public ResponseEntity<List<EncadreurDTO>> getAllEncadreurs() {
+        List<EncadreurDTO> encadreurs = encadreurService.findAllActifs();
+        return ResponseEntity.ok(encadreurs);
+    }
+
+    @GetMapping("/tous")
+    public ResponseEntity<List<EncadreurDTO>> getAllEncadreursWithInactifs() {
         List<EncadreurDTO> encadreurs = encadreurService.findAll();
         return ResponseEntity.ok(encadreurs);
     }
@@ -52,6 +59,8 @@ public class EncadreurController {
             return ResponseEntity.badRequest().body(null);
         }
 
+        // S'assurer que le statut est ACTIF par défaut
+        encadreurDTO.setStatut(StatutEntite.ACTIF);
         EncadreurDTO savedEncadreur = encadreurService.save(encadreurDTO);
         return ResponseEntity.ok(savedEncadreur);
     }
@@ -77,6 +86,32 @@ public class EncadreurController {
         return ResponseEntity.ok().build();
     }
 
+    // NOUVEAUX ENDPOINTS POUR LA GESTION DU STATUT
+    @PutMapping("/{documentId}/desactiver")
+    public ResponseEntity<EncadreurDTO> desactiverEncadreur(@PathVariable String documentId) {
+        EncadreurDTO encadreur = encadreurService.desactiver(documentId);
+        return encadreur != null ? ResponseEntity.ok(encadreur) : ResponseEntity.notFound().build();
+    }
+
+    @PutMapping("/{documentId}/activer")
+    public ResponseEntity<EncadreurDTO> activerEncadreur(@PathVariable String documentId) {
+        EncadreurDTO encadreur = encadreurService.activer(documentId);
+        return encadreur != null ? ResponseEntity.ok(encadreur) : ResponseEntity.notFound().build();
+    }
+
+    @GetMapping("/inactifs")
+    public ResponseEntity<List<EncadreurDTO>> getEncadreursInactifs() {
+        List<EncadreurDTO> encadreurs = encadreurService.findByStatut(StatutEntite.INACTIF);
+        return ResponseEntity.ok(encadreurs);
+    }
+
+    @GetMapping("/statut/{statut}")
+    public ResponseEntity<List<EncadreurDTO>> getEncadreursByStatut(@PathVariable StatutEntite statut) {
+        List<EncadreurDTO> encadreurs = encadreurService.findByStatut(statut);
+        return ResponseEntity.ok(encadreurs);
+    }
+
+    // ENDPOINTS EXISTANTS
     @GetMapping("/superieur/{superieurDocumentId}")
     public ResponseEntity<List<EncadreurDTO>> getEncadreursBySuperieur(@PathVariable String superieurDocumentId) {
         List<EncadreurDTO> encadreurs = encadreurService.findBySuperieurHierarchique(superieurDocumentId);

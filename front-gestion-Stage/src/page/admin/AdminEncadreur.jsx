@@ -4,17 +4,15 @@ import {
   Users, 
   Plus, 
   Search, 
-  Filter,
   Edit2,
   Eye,
   Mail,
   Phone,
-  Building,
-  Calendar,
-  MapPin,
   UserCheck,
   Download,
-  Briefcase,
+  Trash2,
+  UserX,
+  User,
   Link,
   UserCog
 } from "lucide-react";
@@ -48,6 +46,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -71,109 +71,10 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration
-const encadreursData = [
-  {
-    id: 1,
-    nom: "Leroy",
-    prenom: "Thomas",
-    email: "thomas.leroy@entreprise.com",
-    telephone: "+33 6 55 66 77 88",
-    departement: "Cybersécurité",
-    specialite: "Pentesting, Sécurité Réseau",
-    dateEmbauche: "2018-09-05",
-    statut: "Actif",
-    ville: "Lille",
-    superieurId: 1,
-    superieurNom: "Michel Dubois",
-    nombreStagiaires: 3,
-    performance: 4.7,
-    derniereConnexion: "2024-12-10",
-    competences: ["Pentesting", "Network Security", "Cryptography"]
-  },
-  {
-    id: 2,
-    nom: "Garcia",
-    prenom: "Lucas",
-    email: "lucas.garcia@entreprise.com",
-    telephone: "+33 6 66 77 88 99",
-    departement: "Mobile Development",
-    specialite: "React Native, Flutter",
-    dateEmbauche: "2021-11-12",
-    statut: "Actif",
-    ville: "Nantes",
-    superieurId: 1,
-    superieurNom: "Michel Dubois",
-    nombreStagiaires: 2,
-    performance: 4.3,
-    derniereConnexion: "2024-12-09",
-    competences: ["React Native", "Flutter", "iOS", "Android"]
-  },
-  {
-    id: 3,
-    nom: "Roux",
-    prenom: "Emma",
-    email: "emma.roux@entreprise.com",
-    telephone: "+33 6 77 88 99 00",
-    departement: "Data Science",
-    specialite: "Python, Machine Learning",
-    dateEmbauche: "2020-03-20",
-    statut: "Actif",
-    ville: "Marseille",
-    superieurId: 3,
-    superieurNom: "Pierre Bernard",
-    nombreStagiaires: 2,
-    performance: 4.5,
-    derniereConnexion: "2024-12-08",
-    competences: ["Python", "Pandas", "Scikit-learn"]
-  },
-  {
-    id: 4,
-    nom: "Petit",
-    prenom: "Sophie",
-    email: "sophie.petit@entreprise.com",
-    telephone: "+33 6 88 99 00 11",
-    departement: "Marketing Digital",
-    specialite: "SEO, Analytics",
-    dateEmbauche: "2022-02-15",
-    statut: "En congé",
-    ville: "Toulouse",
-    superieurId: 4,
-    superieurNom: "Alice Moreau",
-    nombreStagiaires: 1,
-    performance: 4.0,
-    derniereConnexion: "2024-11-28",
-    competences: ["SEO", "Google Analytics", "Social Media"]
-  },
-  {
-    id: 5,
-    nom: "Blanc",
-    prenom: "Nicolas",
-    email: "nicolas.blanc@entreprise.com",
-    telephone: "+33 6 99 00 11 22",
-    departement: "Design UX/UI",
-    specialite: "Figma, Prototypage",
-    dateEmbauche: "2021-07-10",
-    statut: "Actif",
-    ville: "Lyon",
-    superieurId: 2,
-    superieurNom: "Sophie Martin",
-    nombreStagiaires: 2,
-    performance: 4.2,
-    derniereConnexion: "2024-12-10",
-    competences: ["Figma", "Adobe XD", "User Research"]
-  }
-];
-
-const superieursData = [
-  { id: 1, nom: "Dubois", prenom: "Michel", departement: "Développement Web" },
-  { id: 2, nom: "Martin", prenom: "Sophie", departement: "Design UX/UI" },
-  { id: 3, nom: "Bernard", prenom: "Pierre", departement: "Data Science" },
-  { id: 4, nom: "Moreau", prenom: "Alice", departement: "Marketing Digital" }
-];
-
 export default function AdminEncadreur() {
-  const [encadreurs, setEncadreurs] = useState(encadreursData);
+  const [encadreurs, setEncadreurs] = useState([]);
+  const [superieurs, setSuperieurs] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [filtreDepartement, setFiltreDepartement] = useState("tous");
   const [filtreSuperieur, setFiltreSuperieur] = useState("tous");
@@ -185,14 +86,68 @@ export default function AdminEncadreur() {
     prenom: "",
     email: "",
     telephone: "",
+    cin: "",
+    fonction: "",
     departement: "",
     specialite: "",
-    ville: "",
-    dateEmbauche: "",
-    statut: "Actif",
-    superieurId: "",
-    notes: ""
+    statut: "ACTIF",
+    superieurHierarchiqueDocumentId: "aucun"
   });
+
+  // Configuration Axios
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les encadreurs depuis l'API
+  const fetchEncadreurs = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_BASE_URL}/encadreurs/tous`);
+      setEncadreurs(response.data);
+    } catch (error) {
+      console.error("Erreur lors du chargement des encadreurs:", error);
+      toast.error("Erreur lors du chargement des encadreurs");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Charger les supérieurs depuis l'API
+  const fetchSuperieurs = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/superieurs-hierarchiques/tous`);
+      setSuperieurs(response.data);
+    } catch (error) {
+      console.error("Erreur lors du chargement des supérieurs:", error);
+      toast.error("Erreur lors du chargement des supérieurs");
+    }
+  };
+
+  useEffect(() => {
+    fetchEncadreurs();
+    fetchSuperieurs();
+  }, []);
+
+  // Vérifier si l'email existe déjà
+  const checkEmailExists = (email, currentDocumentId = null) => {
+    const encadreurWithEmail = encadreurs.find(e => e.email === email);
+    
+    if (currentDocumentId && encadreurWithEmail) {
+      return encadreurWithEmail.documentId !== currentDocumentId;
+    }
+    
+    return !!encadreurWithEmail;
+  };
+
+  // Vérifier si le CIN existe déjà
+  const checkCinExists = (cin, currentDocumentId = null) => {
+    const encadreurWithCin = encadreurs.find(e => e.cin === cin);
+    
+    if (currentDocumentId && encadreurWithCin) {
+      return encadreurWithCin.documentId !== currentDocumentId;
+    }
+    
+    return !!encadreurWithCin;
+  };
 
   // Réinitialiser le formulaire
   const resetForm = () => {
@@ -201,13 +156,12 @@ export default function AdminEncadreur() {
       prenom: "",
       email: "",
       telephone: "",
+      cin: "",
+      fonction: "",
       departement: "",
       specialite: "",
-      ville: "",
-      dateEmbauche: "",
-      statut: "Actif",
-      superieurId: "",
-      notes: ""
+      statut: "ACTIF",
+      superieurHierarchiqueDocumentId: "aucun"
     });
     setSelectedEncadreur(null);
   };
@@ -217,17 +171,16 @@ export default function AdminEncadreur() {
     if (encadreur) {
       setSelectedEncadreur(encadreur);
       setFormData({
-        nom: encadreur.nom,
-        prenom: encadreur.prenom,
-        email: encadreur.email,
-        telephone: encadreur.telephone,
-        departement: encadreur.departement,
-        specialite: encadreur.specialite,
-        ville: encadreur.ville,
-        dateEmbauche: encadreur.dateEmbauche,
-        statut: encadreur.statut,
-        superieurId: encadreur.superieurId?.toString() || "",
-        notes: encadreur.notes || ""
+        nom: encadreur.nom || "",
+        prenom: encadreur.prenom || "",
+        email: encadreur.email || "",
+        telephone: encadreur.telephone || "",
+        cin: encadreur.cin || "",
+        fonction: encadreur.fonction || "",
+        departement: encadreur.departement || "",
+        specialite: encadreur.specialite || "",
+        statut: encadreur.statut || "ACTIF",
+        superieurHierarchiqueDocumentId: encadreur.superieurHierarchiqueDocumentId || "aucun"
       });
     } else {
       resetForm();
@@ -235,82 +188,157 @@ export default function AdminEncadreur() {
     setOpenDialog(true);
   };
 
-  // Sauvegarder l'encadreur
-  const handleSaveEncadreur = () => {
-    const selectedSuperieur = superieursData.find(s => s.id.toString() === formData.superieurId);
-    
-    if (selectedEncadreur) {
-      // Modification
-      setEncadreurs(prev => prev.map(e => 
-        e.id === selectedEncadreur.id 
-          ? { 
-              ...e, 
-              ...formData,
-              superieurId: formData.superieurId ? parseInt(formData.superieurId) : null,
-              superieurNom: selectedSuperieur ? `${selectedSuperieur.prenom} ${selectedSuperieur.nom}` : "Non assigné"
-            }
-          : e
-      ));
-    } else {
-      // Création
-      const newEncadreur = {
-        ...formData,
-        id: Math.max(...encadreurs.map(e => e.id)) + 1,
-        superieurId: formData.superieurId ? parseInt(formData.superieurId) : null,
-        superieurNom: selectedSuperieur ? `${selectedSuperieur.prenom} ${selectedSuperieur.nom}` : "Non assigné",
-        nombreStagiaires: 0,
-        performance: 4.0,
-        derniereConnexion: new Date().toISOString().split('T')[0],
-        competences: []
-      };
-      setEncadreurs(prev => [...prev, newEncadreur]);
+  const handleSaveEncadreur = async () => {
+    try {
+      // Validation des champs requis
+      if (!formData.nom || !formData.prenom || !formData.email || !formData.telephone || !formData.cin || !formData.fonction) {
+        toast.error("Veuillez remplir tous les champs obligatoires");
+        return;
+      }
+
+      let response;
+      const superieurId = formData.superieurHierarchiqueDocumentId === "aucun" ? null : formData.superieurHierarchiqueDocumentId;
+
+      if (selectedEncadreur) {
+        const dataToSend = { 
+          id: selectedEncadreur.id,
+          nom: formData.nom,
+          prenom: formData.prenom,
+          email: formData.email,
+          telephone: formData.telephone,
+          cin: formData.cin,
+          fonction: formData.fonction,
+          departement: formData.departement,
+          specialite: formData.specialite,
+          statut: formData.statut,
+          superieurHierarchiqueDocumentId: superieurId
+        };
+        
+        response = await axios.put(`${API_BASE_URL}/encadreurs/${selectedEncadreur.documentId}`, dataToSend);
+        toast.success("Encadreur modifié avec succès");
+      } else {
+        // Vérifications pour la création
+        if (checkEmailExists(formData.email)) {
+          toast.error("Cet email est déjà utilisé par un autre encadreur");
+          return;
+        }
+        
+        if (checkCinExists(formData.cin)) {
+          toast.error("Ce CIN est déjà utilisé par un autre encadreur");
+          return;
+        }
+
+        const dataToSend = {
+          ...formData,
+          superieurHierarchiqueDocumentId: superieurId
+        };
+        
+        response = await axios.post(`${API_BASE_URL}/encadreurs`, dataToSend);
+        toast.success("Encadreur créé avec succès");
+      }
+      
+      await fetchEncadreurs();
+      setOpenDialog(false);
+      resetForm();
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde:", error);
+      if (error.response?.status === 500) {
+        const errorMessage = error.response.data?.message || '';
+        if (errorMessage.includes('cin')) {
+          toast.error("Ce CIN est déjà utilisé par un autre encadreur");
+        } else if (errorMessage.includes('email')) {
+          toast.error("Cet email est déjà utilisé par un autre encadreur");
+        } else {
+          toast.error("Erreur lors de la sauvegarde");
+        }
+      } else {
+        toast.error("Erreur lors de la sauvegarde");
+      }
     }
-    setOpenDialog(false);
-    resetForm();
+  };
+
+  // Supprimer un encadreur
+  const handleDeleteEncadreur = async (documentId) => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer cet encadreur ?")) {
+      return;
+    }
+
+    try {
+      await axios.delete(`${API_BASE_URL}/encadreurs/${documentId}`);
+      toast.success("Encadreur supprimé avec succès");
+      await fetchEncadreurs();
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error("Erreur lors de la suppression de l'encadreur");
+    }
+  };
+
+  // Activer/Désactiver un encadreur
+  const handleToggleStatus = async (documentId, currentStatus) => {
+    try {
+      if (currentStatus === "ACTIF") {
+        await axios.put(`${API_BASE_URL}/encadreurs/${documentId}/desactiver`);
+        toast.success("Encadreur désactivé avec succès");
+      } else {
+        await axios.put(`${API_BASE_URL}/encadreurs/${documentId}/activer`);
+        toast.success("Encadreur activé avec succès");
+      }
+      await fetchEncadreurs();
+    } catch (error) {
+      console.error("Erreur lors du changement de statut:", error);
+      toast.error("Erreur lors du changement de statut");
+    }
   };
 
   const getStatutColor = (statut) => {
     switch (statut) {
-      case 'Actif': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
-      case 'En congé': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
-      case 'Inactif': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
+      case 'ACTIF': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'INACTIF': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     }
   };
 
-  const getPerformanceColor = (performance) => {
-    if (performance >= 4.5) return 'bg-emerald-100 text-emerald-700';
-    if (performance >= 4.0) return 'bg-blue-100 text-blue-700';
-    if (performance >= 3.5) return 'bg-amber-100 text-amber-700';
-    return 'bg-red-100 text-red-700';
+  const getStatutLabel = (statut) => {
+    switch (statut) {
+      case 'ACTIF': return 'Actif';
+      case 'INACTIF': return 'Inactif';
+      default: return statut;
+    }
   };
 
-  // Listes uniques pour les filtres
-  const departements = [...new Set(encadreurs.map(e => e.departement))];
-  const superieursList = [...new Set(encadreurs.map(e => e.superieurNom).filter(Boolean))];
+  // Obtenir le nom du supérieur
+  const getSuperieurNom = (superieurDocumentId) => {
+    if (!superieurDocumentId || superieurDocumentId === "aucun") return "Non assigné";
+    const superieur = superieurs.find(s => s.documentId === superieurDocumentId);
+    return superieur ? `${superieur.prenom} ${superieur.nom}` : "Supérieur inconnu";
+  };
+
+  // Liste unique des départements
+  const departements = [...new Set(encadreurs.map(e => e.departement).filter(Boolean))];
+  const superieursList = [...new Set(encadreurs.map(e => e.superieurHierarchiqueDocumentId).filter(Boolean))];
 
   const encadreursFiltres = encadreurs.filter(encadreur => {
     const correspondRecherche = 
-      encadreur.nom.toLowerCase().includes(recherche.toLowerCase()) ||
-      encadreur.prenom.toLowerCase().includes(recherche.toLowerCase()) ||
-      encadreur.email.toLowerCase().includes(recherche.toLowerCase()) ||
-      encadreur.departement.toLowerCase().includes(recherche.toLowerCase()) ||
-      encadreur.specialite.toLowerCase().includes(recherche.toLowerCase());
+      encadreur.nom?.toLowerCase().includes(recherche.toLowerCase()) ||
+      encadreur.prenom?.toLowerCase().includes(recherche.toLowerCase()) ||
+      encadreur.email?.toLowerCase().includes(recherche.toLowerCase()) ||
+      encadreur.departement?.toLowerCase().includes(recherche.toLowerCase()) ||
+      encadreur.specialite?.toLowerCase().includes(recherche.toLowerCase()) ||
+      encadreur.cin?.toLowerCase().includes(recherche.toLowerCase());
     
     const correspondStatut = filtreStatut === "tous" || encadreur.statut === filtreStatut;
     const correspondDepartement = filtreDepartement === "tous" || encadreur.departement === filtreDepartement;
-    const correspondSuperieur = filtreSuperieur === "tous" || encadreur.superieurNom === filtreSuperieur;
+    const correspondSuperieur = filtreSuperieur === "tous" || 
+      (filtreSuperieur === "non_assigné" ? !encadreur.superieurHierarchiqueDocumentId : encadreur.superieurHierarchiqueDocumentId === filtreSuperieur);
     
     return correspondRecherche && correspondStatut && correspondDepartement && correspondSuperieur;
   });
 
   const stats = {
     total: encadreurs.length,
-    actifs: encadreurs.filter(e => e.statut === 'Actif').length,
-    enConge: encadreurs.filter(e => e.statut === 'En congé').length,
-    totalStagiaires: encadreurs.reduce((acc, e) => acc + e.nombreStagiaires, 0),
-    moyennePerformance: Math.round(encadreurs.reduce((acc, e) => acc + e.performance, 0) / encadreurs.length * 10) / 10,
-    sansSuperieur: encadreurs.filter(e => !e.superieurId).length
+    actifs: encadreurs.filter(e => e.statut === 'ACTIF').length,
+    inactifs: encadreurs.filter(e => e.statut === 'INACTIF').length,
+    sansSuperieur: encadreurs.filter(e => !e.superieurHierarchiqueDocumentId).length
   };
 
   const handleViewDetails = (encadreur) => {
@@ -323,6 +351,17 @@ export default function AdminEncadreur() {
     // Logique d'export
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des encadreurs...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 80 }}
@@ -331,6 +370,21 @@ export default function AdminEncadreur() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -382,43 +436,70 @@ export default function AdminEncadreur() {
                 <div className="grid gap-4 py-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="prenom" className="text-gray-700 dark:text-gray-300">Prénom</Label>
+                      <Label htmlFor="prenom" className="text-gray-700 dark:text-gray-300">Prénom *</Label>
                       <Input
                         id="prenom"
                         value={formData.prenom}
                         onChange={(e) => setFormData(prev => ({ ...prev, prenom: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="nom" className="text-gray-700 dark:text-gray-300">Nom</Label>
+                      <Label htmlFor="nom" className="text-gray-700 dark:text-gray-300">Nom *</Label>
                       <Input
                         id="nom"
                         value={formData.nom}
                         onChange={(e) => setFormData(prev => ({ ...prev, nom: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email</Label>
+                      <Label htmlFor="email" className="text-gray-700 dark:text-gray-300">Email *</Label>
                       <Input
                         id="email"
                         type="email"
                         value={formData.email}
                         onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="telephone" className="text-gray-700 dark:text-gray-300">Téléphone</Label>
+                      <Label htmlFor="telephone" className="text-gray-700 dark:text-gray-300">Téléphone *</Label>
                       <Input
                         id="telephone"
                         value={formData.telephone}
                         onChange={(e) => setFormData(prev => ({ ...prev, telephone: e.target.value }))}
                         className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="cin" className="text-gray-700 dark:text-gray-300">CIN *</Label>
+                      <Input
+                        id="cin"
+                        value={formData.cin}
+                        onChange={(e) => setFormData(prev => ({ ...prev, cin: e.target.value }))}
+                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fonction" className="text-gray-700 dark:text-gray-300">Fonction *</Label>
+                      <Input
+                        id="fonction"
+                        value={formData.fonction}
+                        onChange={(e) => setFormData(prev => ({ ...prev, fonction: e.target.value }))}
+                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
+                        required
                       />
                     </div>
                   </div>
@@ -446,67 +527,36 @@ export default function AdminEncadreur() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="ville" className="text-gray-700 dark:text-gray-300">Ville</Label>
-                      <Input
-                        id="ville"
-                        value={formData.ville}
-                        onChange={(e) => setFormData(prev => ({ ...prev, ville: e.target.value }))}
-                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dateEmbauche" className="text-gray-700 dark:text-gray-300">Date d'embauche</Label>
-                      <Input
-                        id="dateEmbauche"
-                        type="date"
-                        value={formData.dateEmbauche}
-                        onChange={(e) => setFormData(prev => ({ ...prev, dateEmbauche: e.target.value }))}
-                        className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
                       <Label htmlFor="statut" className="text-gray-700 dark:text-gray-300">Statut</Label>
                       <Select value={formData.statut} onValueChange={(value) => setFormData(prev => ({ ...prev, statut: value }))}>
                         <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
-                          <SelectItem value="Actif" className="text-gray-900 dark:text-white">Actif</SelectItem>
-                          <SelectItem value="En congé" className="text-gray-900 dark:text-white">En congé</SelectItem>
-                          <SelectItem value="Inactif" className="text-gray-900 dark:text-white">Inactif</SelectItem>
+                          <SelectItem value="ACTIF" className="text-gray-900 dark:text-white">Actif</SelectItem>
+                          <SelectItem value="INACTIF" className="text-gray-900 dark:text-white">Inactif</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="superieurId" className="text-gray-700 dark:text-gray-300">Supérieur Hiérarchique</Label>
-                      <Select value={formData.superieurId} onValueChange={(value) => setFormData(prev => ({ ...prev, superieurId: value }))}>
+                      <Label htmlFor="superieurHierarchiqueDocumentId" className="text-gray-700 dark:text-gray-300">Supérieur Hiérarchique</Label>
+                      <Select 
+                        value={formData.superieurHierarchiqueDocumentId} 
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, superieurHierarchiqueDocumentId: value }))}
+                      >
                         <SelectTrigger className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white">
                           <SelectValue placeholder="Sélectionner un supérieur" />
                         </SelectTrigger>
                         <SelectContent className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
                           <SelectItem value="aucun" className="text-gray-900 dark:text-white">Aucun supérieur</SelectItem>
-                          {superieursData.map(superieur => (
-                            <SelectItem key={superieur.id} value={superieur.id.toString()} className="text-gray-900 dark:text-white">
+                          {superieurs.map(superieur => (
+                            <SelectItem key={superieur.documentId} value={superieur.documentId} className="text-gray-900 dark:text-white">
                               {superieur.prenom} {superieur.nom} - {superieur.departement}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="notes" className="text-gray-700 dark:text-gray-300">Notes</Label>
-                    <Input
-                      id="notes"
-                      value={formData.notes}
-                      onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-                      placeholder="Notes supplémentaires..."
-                      className="bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                    />
                   </div>
                 </div>
 
@@ -554,15 +604,15 @@ export default function AdminEncadreur() {
             gradient: "from-emerald-500 to-emerald-600"
           },
           {
-            title: "Stagiaires Encadrés",
-            icon: <UserCog className="h-6 w-6 text-purple-600" />,
-            count: stats.totalStagiaires,
-            text: "Total stagiaires supervisés",
-            gradient: "from-purple-500 to-purple-600"
+            title: "Encadreurs Inactifs",
+            icon: <UserX className="h-6 w-6 text-red-600" />,
+            count: stats.inactifs,
+            text: "Actuellement inactifs",
+            gradient: "from-red-500 to-red-600"
           },
           {
             title: "Sans Supérieur",
-            icon: <UserCheck className="h-6 w-6 text-amber-600" />,
+            icon: <UserCog className="h-6 w-6 text-amber-600" />,
             count: stats.sansSuperieur,
             text: "À assigner",
             gradient: "from-amber-500 to-amber-600"
@@ -619,9 +669,8 @@ export default function AdminEncadreur() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Tous les statuts</SelectItem>
-                      <SelectItem value="Actif">Actifs</SelectItem>
-                      <SelectItem value="En congé">En congé</SelectItem>
-                      <SelectItem value="Inactif">Inactifs</SelectItem>
+                      <SelectItem value="ACTIF">Actifs</SelectItem>
+                      <SelectItem value="INACTIF">Inactifs</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -645,11 +694,14 @@ export default function AdminEncadreur() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Tous les supérieurs</SelectItem>
-                      {superieursList.map(superieur => (
-                        <SelectItem key={superieur} value={superieur}>
-                          {superieur}
-                        </SelectItem>
-                      ))}
+                      {superieursList.map(superieurId => {
+                        const superieur = superieurs.find(s => s.documentId === superieurId);
+                        return superieur ? (
+                          <SelectItem key={superieurId} value={superieurId}>
+                            {superieur.prenom} {superieur.nom}
+                          </SelectItem>
+                        ) : null;
+                      }).filter(Boolean)}
                       <SelectItem value="non_assigné">Non assigné</SelectItem>
                     </SelectContent>
                   </Select>
@@ -685,20 +737,20 @@ export default function AdminEncadreur() {
                   <TableHead>Contact</TableHead>
                   <TableHead>Département & Spécialité</TableHead>
                   <TableHead>Supérieur</TableHead>
-                  <TableHead>Stagiaires</TableHead>
-                  <TableHead>Performance</TableHead>
+                  <TableHead>CIN</TableHead>
                   <TableHead>Statut</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {encadreursFiltres.map((encadreur) => (
-                  <TableRow key={encadreur.id}>
+                  <TableRow key={encadreur.documentId}>
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
+                          <AvatarImage src={encadreur.photoUrl} />
                           <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                            {encadreur.prenom[0]}{encadreur.nom[0]}
+                            {encadreur.prenom?.[0]}{encadreur.nom?.[0]}
                           </AvatarFallback>
                         </Avatar>
                         <div>
@@ -706,7 +758,7 @@ export default function AdminEncadreur() {
                             {encadreur.prenom} {encadreur.nom}
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
-                            {encadreur.ville}
+                            {encadreur.fonction}
                           </div>
                         </div>
                       </div>
@@ -731,10 +783,10 @@ export default function AdminEncadreur() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        {encadreur.superieurNom ? (
+                        {encadreur.superieurHierarchiqueDocumentId ? (
                           <Badge variant="outline" className="flex items-center gap-1">
                             <Link className="h-3 w-3" />
-                            {encadreur.superieurNom}
+                            {getSuperieurNom(encadreur.superieurHierarchiqueDocumentId)}
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-amber-600 border-amber-300">
@@ -744,20 +796,11 @@ export default function AdminEncadreur() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">
-                          {encadreur.nombreStagiaires} stagiaires
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getPerformanceColor(encadreur.performance)}>
-                        {encadreur.performance}/5
-                      </Badge>
+                      <div className="font-mono text-sm">{encadreur.cin}</div>
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatutColor(encadreur.statut)}>
-                        {encadreur.statut}
+                        {getStatutLabel(encadreur.statut)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -765,8 +808,17 @@ export default function AdminEncadreur() {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleToggleStatus(encadreur.documentId, encadreur.statut)}
+                          title={encadreur.statut === "ACTIF" ? "Désactiver" : "Activer"}
+                        >
+                          {encadreur.statut === "ACTIF" ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleOpenDialog(encadreur)}
-                          title="Modifier et changer de supérieur"
+                          title="Modifier"
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
@@ -778,6 +830,16 @@ export default function AdminEncadreur() {
                           title="Voir détails"
                         >
                           <Eye className="h-4 w-4" />
+                        </Button>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteEncadreur(encadreur.documentId)}
+                          title="Supprimer"
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

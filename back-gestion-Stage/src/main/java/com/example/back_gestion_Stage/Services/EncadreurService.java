@@ -1,9 +1,12 @@
 package com.example.back_gestion_Stage.Services;
 
 import com.example.back_gestion_Stage.Entities.Encadreur;
-import com.example.back_gestion_Stage.Entities.SuperieurHierarchique;
+import com.example.back_gestion_Stage.Entities.Stagiaire;
+import com.example.back_gestion_Stage.Entities.CompteUtilisateur;
 import com.example.back_gestion_Stage.DTOs.EncadreurDTO;
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import com.example.back_gestion_Stage.Repositories.EncadreurRepository;
+import com.example.back_gestion_Stage.Repositories.StagiaireRepository;
 import com.example.back_gestion_Stage.Repositories.SuperieurHierarchiqueRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,6 +25,12 @@ public class EncadreurService extends BaseService<Encadreur, EncadreurDTO> {
 
     @Autowired
     private SuperieurHierarchiqueRepository superieurHierarchiqueRepository;
+
+    @Autowired
+    private StagiaireRepository stagiaireRepository;
+
+    @Autowired
+    private CompteUtilisateurService compteUtilisateurService;
 
     @Override
     protected EncadreurRepository getRepository() {
@@ -43,8 +52,8 @@ public class EncadreurService extends BaseService<Encadreur, EncadreurDTO> {
         dto.setFonction(entity.getFonction());
         dto.setDepartement(entity.getDepartement());
         dto.setSpecialite(entity.getSpecialite());
+        dto.setStatut(entity.getStatut());
         
-        // Charger la relation avec le supérieur hiérarchique
         if (entity.getSuperieurHierarchique() != null) {
             dto.setSuperieurHierarchiqueDocumentId(entity.getSuperieurHierarchique().getDocumentId());
         }
@@ -69,8 +78,8 @@ public class EncadreurService extends BaseService<Encadreur, EncadreurDTO> {
         entity.setFonction(dto.getFonction());
         entity.setDepartement(dto.getDepartement());
         entity.setSpecialite(dto.getSpecialite());
+        entity.setStatut(dto.getStatut());
         
-        // Établir la relation avec le supérieur hiérarchique
         if (dto.getSuperieurHierarchiqueDocumentId() != null) {
             superieurHierarchiqueRepository.findByDocumentId(dto.getSuperieurHierarchiqueDocumentId())
                 .ifPresent(entity::setSuperieurHierarchique);
@@ -79,42 +88,121 @@ public class EncadreurService extends BaseService<Encadreur, EncadreurDTO> {
         return entity;
     }
 
-    // Méthode pour créer un encadreur avec relations
-    @Transactional
-    public EncadreurDTO createEncadreurWithRelations(EncadreurDTO encadreurDTO) {
-        Encadreur encadreur = convertToEntity(encadreurDTO);
-        Encadreur savedEncadreur = encadreurRepository.save(encadreur);
-        return convertToDto(savedEncadreur);
+    // NOUVELLE MÉTHODE POUR LA MISE À JOUR
+    @Override
+    protected void updateEntityFromDto(Encadreur entity, EncadreurDTO dto) {
+        if (dto.getNom() != null) entity.setNom(dto.getNom());
+        if (dto.getPrenom() != null) entity.setPrenom(dto.getPrenom());
+        if (dto.getEmail() != null) entity.setEmail(dto.getEmail());
+        if (dto.getTelephone() != null) entity.setTelephone(dto.getTelephone());
+        if (dto.getCin() != null) entity.setCin(dto.getCin());
+        if (dto.getFonction() != null) entity.setFonction(dto.getFonction());
+        if (dto.getDepartement() != null) entity.setDepartement(dto.getDepartement());
+        if (dto.getSpecialite() != null) entity.setSpecialite(dto.getSpecialite());
+        if (dto.getStatut() != null) entity.setStatut(dto.getStatut());
+        // Ne pas mettre à jour : id, documentId, createdAt, updatedAt, photo, superieurHierarchique
     }
 
-    // Surcharger la méthode save
-    @Override
-    @Transactional
-    public EncadreurDTO save(EncadreurDTO dto) {
-        return createEncadreurWithRelations(dto);
-    }
+    // ... [le reste des méthodes reste inchangé] ...
 
-    @Override
-    public Optional<EncadreurDTO> findByDocumentId(String documentId) {
-        return encadreurRepository.findByDocumentId(documentId)
-                .map(this::convertToDto);
+    // Méthodes spécifiques avec filtrage par statut
+    public List<EncadreurDTO> findAllActifs() {
+        return encadreurRepository.findAll().stream()
+                .filter(encadreur -> encadreur.getStatut() == StatutEntite.ACTIF)
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 
     public Optional<EncadreurDTO> findByEmail(String email) {
         return encadreurRepository.findByEmail(email)
+                .filter(encadreur -> encadreur.getStatut() == StatutEntite.ACTIF)
                 .map(this::convertToDto);
     }
 
     public List<EncadreurDTO> findBySuperieurHierarchique(String superieurDocumentId) {
         return encadreurRepository.findBySuperieurHierarchiqueDocumentId(superieurDocumentId)
                 .stream()
+                .filter(encadreur -> encadreur.getStatut() == StatutEntite.ACTIF)
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
 
+    public boolean existsByEmail(String email) {
+        return encadreurRepository.findByEmail(email)
+                .map(encadreur -> encadreur.getStatut() == StatutEntite.ACTIF)
+                .orElse(false);
+    }
+
+    public boolean existsByCin(String cin) {
+        return encadreurRepository.findByCin(cin)
+                .map(encadreur -> encadreur.getStatut() == StatutEntite.ACTIF)
+                .orElse(false);
+    }
+
+    // Méthodes de gestion du statut
+    public EncadreurDTO desactiver(String documentId) {
+        Optional<Encadreur> encadreurOpt = encadreurRepository.findByDocumentId(documentId);
+        if (encadreurOpt.isPresent()) {
+            Encadreur encadreur = encadreurOpt.get();
+            encadreur.setStatut(StatutEntite.INACTIF);
+            Encadreur savedEncadreur = encadreurRepository.save(encadreur);
+            
+            // Désactiver le compte utilisateur associé
+            compteUtilisateurService.findByEntity(encadreur.getDocumentId(), 
+                    CompteUtilisateur.TypeCompte.ENCADREUR)
+                .ifPresent(compte -> {
+                    compteUtilisateurService.desactiver(compte.getDocumentId());
+                });
+            
+            // Désactiver les stagiaires de cet encadreur
+            List<Stagiaire> stagiaires = stagiaireRepository.findByEncadreurDocumentId(encadreur.getDocumentId());
+            for (Stagiaire stagiaire : stagiaires) {
+                stagiaire.setStatut(StatutEntite.INACTIF);
+                stagiaireRepository.save(stagiaire);
+                
+                compteUtilisateurService.findByEntity(stagiaire.getDocumentId(), 
+                        CompteUtilisateur.TypeCompte.STAGIAIRE)
+                    .ifPresent(compte -> {
+                        compteUtilisateurService.desactiver(compte.getDocumentId());
+                    });
+            }
+            
+            return convertToDto(savedEncadreur);
+        }
+        return null;
+    }
+
+    public EncadreurDTO activer(String documentId) {
+        Optional<Encadreur> encadreurOpt = encadreurRepository.findByDocumentId(documentId);
+        if (encadreurOpt.isPresent()) {
+            Encadreur encadreur = encadreurOpt.get();
+            encadreur.setStatut(StatutEntite.ACTIF);
+            Encadreur savedEncadreur = encadreurRepository.save(encadreur);
+            
+            // Activer le compte utilisateur associé
+            compteUtilisateurService.findByEntity(encadreur.getDocumentId(), 
+                    CompteUtilisateur.TypeCompte.ENCADREUR)
+                .ifPresent(compte -> {
+                    compteUtilisateurService.activer(compte.getDocumentId());
+                });
+            
+            return convertToDto(savedEncadreur);
+        }
+        return null;
+    }
+
+    public List<EncadreurDTO> findByStatut(StatutEntite statut) {
+        return encadreurRepository.findAll().stream()
+                .filter(encadreur -> encadreur.getStatut() == statut)
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    // Autres méthodes inchangées
     public List<EncadreurDTO> findByDepartement(String departement) {
         return encadreurRepository.findByDepartement(departement)
                 .stream()
+                .filter(encadreur -> encadreur.getStatut() == StatutEntite.ACTIF)
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
@@ -122,16 +210,9 @@ public class EncadreurService extends BaseService<Encadreur, EncadreurDTO> {
     public List<EncadreurDTO> findAllWithSuperieur() {
         return encadreurRepository.findAllWithSuperieur()
                 .stream()
+                .filter(encadreur -> encadreur.getStatut() == StatutEntite.ACTIF)
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
-    }
-
-    public boolean existsByEmail(String email) {
-        return encadreurRepository.existsByEmail(email);
-    }
-
-    public boolean existsByCin(String cin) {
-        return encadreurRepository.existsByCin(cin);
     }
 
     @Override

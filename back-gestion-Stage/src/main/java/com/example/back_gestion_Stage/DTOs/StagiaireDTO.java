@@ -1,5 +1,6 @@
 package com.example.back_gestion_Stage.DTOs;
 
+import com.example.back_gestion_Stage.Entities.StatutEntite;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import java.time.LocalDate;
@@ -17,6 +18,7 @@ public class StagiaireDTO extends BaseDTO {
     private String niveauEtude;
     private LocalDate dateNaissance;
     private String adresse;
+    private StatutEntite statut;
     private MediaFileDTO photo;
     private String encadreurDocumentId;
     private String photoUrl;
