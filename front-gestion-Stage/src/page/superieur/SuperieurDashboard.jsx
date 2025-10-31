@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Users, 
@@ -12,11 +13,16 @@ import {
   BarChart3,
   Eye,
   Download,
-  Activity
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -40,37 +46,221 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration consolidées pour le supérieur
-const dashboardData = {
-  statsGlobales: {
-    totalStagiaires: 45,
-    totalEncadreurs: 8,
-    stagesActifs: 23,
-    stagesTermines: 12,
-    rapportsComplets: 38,
-    satisfactionGenerale: 86
-  },
-  performanceEncadreurs: [
-    { nom: "Michel Dubois", stagiaires: 6, progression: 92, satisfaction: 94 },
-    { nom: "Sophie Martin", stagiaires: 5, progression: 88, satisfaction: 91 },
-    { nom: "Pierre Bernard", stagiaires: 7, progression: 78, satisfaction: 85 },
-    { nom: "Alice Moreau", stagiaires: 4, progression: 95, satisfaction: 96 },
-    { nom: "Thomas Leroy", stagiaires: 6, progression: 82, satisfaction: 87 }
-  ],
-  alertes: [
-    { type: "urgence", message: "2 rapports en retard", encadreur: "Pierre Bernard" },
-    { type: "warning", message: "Stage à risque d'échec", encadreur: "Thomas Leroy" },
-    { type: "info", message: "Nouvel encadreur à former", encadreur: "Nouveau" }
-  ],
-  evolutionMensuelle: {
-    stagiaires: [35, 38, 42, 45, 48, 45],
-    rapports: [25, 28, 32, 35, 38, 38],
-    satisfaction: [82, 84, 85, 86, 87, 86]
-  }
-};
-
 export default function SuperieurDashboard() {
-  const { statsGlobales, performanceEncadreurs, alertes } = dashboardData;
+  const [dashboardData, setDashboardData] = useState({
+    statsGlobales: {
+      totalStagiaires: 0,
+      totalEncadreurs: 0,
+      stagesActifs: 0,
+      stagesTermines: 0,
+      stagesEnAttente: 0,
+      satisfactionGenerale: 0
+    },
+    performanceEncadreurs: [],
+    alertes: [],
+    tachesEnRetard: []
+  });
+  const [loading, setLoading] = useState(true);
+
+  // Configuration API
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les données du dashboard
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer l'ID du supérieur connecté
+      const user = JSON.parse(localStorage.getItem("user"));
+      const superieurId = user?.entityDocumentId;
+      
+      if (!superieurId) {
+        toast.error("Impossible de récupérer les informations du supérieur");
+        return;
+      }
+
+      // Récupérer tous les encadreurs sous la supervision du supérieur
+      const encadreursResponse = await axios.get(`${API_BASE_URL}/encadreurs/superieur/${superieurId}`);
+      const encadreurs = encadreursResponse.data;
+
+      // Pour chaque encadreur, récupérer le nombre de stagiaires (MÊME MÉTHODE QUE SuperieurEncadreur)
+      const encadreursAvecStagiaires = await Promise.all(
+        encadreurs.map(async (encadreur) => {
+          try {
+            const stagiairesResponse = await axios.get(`${API_BASE_URL}/stagiaires/encadreur/${encadreur.documentId}`);
+            const nombreStagiaires = stagiairesResponse.data.length;
+            
+            return {
+              ...encadreur,
+              nombreStagiaires: nombreStagiaires
+            };
+          } catch (error) {
+            console.error(`Erreur lors du chargement des stagiaires pour ${encadreur.prenom} ${encadreur.nom}:`, error);
+            return {
+              ...encadreur,
+              nombreStagiaires: 0
+            };
+          }
+        })
+      );
+
+      // Récupérer tous les stages sous la supervision du supérieur
+      const stagesResponse = await axios.get(`${API_BASE_URL}/stages/superieur/${superieurId}`);
+      const stages = stagesResponse.data;
+
+      // Récupérer les tâches en retard
+      let tachesEnRetard = [];
+      try {
+        const tachesResponse = await axios.get(`${API_BASE_URL}/taches/en-retard`);
+        tachesEnRetard = tachesResponse.data;
+      } catch (error) {
+        console.error("Erreur récupération tâches en retard:", error);
+      }
+
+      // Calculer les statistiques globales AVEC LA MÊME MÉTHODE
+      const totalStagiaires = encadreursAvecStagiaires.reduce((acc, encadreur) => {
+        return acc + (encadreur.nombreStagiaires || 0);
+      }, 0);
+
+      const stagesActifs = stages.filter(stage => stage.statutStage === 'EN_COURS').length;
+      const stagesTermines = stages.filter(stage => stage.statutStage === 'TERMINE').length;
+      const stagesEnAttente = stages.filter(stage => stage.statutStage === 'EN_ATTENTE_VALIDATION').length;
+
+      // Calculer la performance des encadreurs
+      const performanceEncadreurs = await Promise.all(
+        encadreursAvecStagiaires.map(async (encadreur) => {
+          try {
+            // Récupérer les stages de l'encadreur
+            const stagesEncadreur = stages.filter(stage => 
+              stage.encadreurDocumentId === encadreur.documentId
+            );
+
+            // Récupérer les tâches de l'encadreur
+            let tachesTerminees = 0;
+            let tachesTotal = 0;
+            let tachesEnRetardCount = 0;
+            
+            for (const stage of stagesEncadreur) {
+              try {
+                const tachesStageResponse = await axios.get(`${API_BASE_URL}/taches/stage/${stage.documentId}`);
+                const tachesStage = tachesStageResponse.data;
+                tachesTotal += tachesStage.length;
+                tachesTerminees += tachesStage.filter(tache => tache.statut === 'TERMINEE').length;
+                tachesEnRetardCount += tachesStage.filter(tache => tache.enRetard).length;
+              } catch (error) {
+                console.error("Erreur récupération tâches:", error);
+              }
+            }
+
+            // Calculer la progression moyenne
+            const progression = tachesTotal > 0 ? Math.round((tachesTerminees / tachesTotal) * 100) : 0;
+            
+            // Calculer la satisfaction (basée sur la progression, nombre de stagiaires et tâches en retard)
+            let baseSatisfaction = progression;
+            const bonusStagiaires = Math.min(encadreur.nombreStagiaires * 2, 20); // Bonus max 20%
+            const malusRetard = Math.min(tachesEnRetardCount * 5, 30); // Malus max 30%
+            
+            const satisfaction = Math.max(0, Math.min(baseSatisfaction + bonusStagiaires - malusRetard, 100));
+
+            return {
+              nom: `${encadreur.prenom} ${encadreur.nom}`,
+              documentId: encadreur.documentId,
+              stagiaires: encadreur.nombreStagiaires,
+              progression: progression,
+              satisfaction: Math.round(satisfaction),
+              stages: stagesEncadreur.length,
+              tachesEnRetard: tachesEnRetardCount
+            };
+          } catch (error) {
+            console.error("Erreur calcul performance encadreur:", error);
+            return {
+              nom: `${encadreur.prenom} ${encadreur.nom}`,
+              documentId: encadreur.documentId,
+              stagiaires: encadreur.nombreStagiaires,
+              progression: 0,
+              satisfaction: 0,
+              stages: 0,
+              tachesEnRetard: 0
+            };
+          }
+        })
+      );
+
+      // Générer les alertes
+      const alertes = [];
+      
+      // Alertes pour les stages en attente de validation
+      if (stagesEnAttente > 0) {
+        alertes.push({
+          type: "warning",
+          message: `${stagesEnAttente} stage(s) en attente de validation`,
+          encadreur: "Multiple",
+          action: "/superieur/stage"
+        });
+      }
+
+      // Alertes pour les tâches en retard
+      if (tachesEnRetard.length > 0) {
+        // Compter les tâches en retard par encadreur
+        const tachesParEncadreur = {};
+        tachesEnRetard.forEach(tache => {
+          const encadreurNom = tache.encadreurNom || "Inconnu";
+          tachesParEncadreur[encadreurNom] = (tachesParEncadreur[encadreurNom] || 0) + 1;
+        });
+
+        const encadreursAvecRetard = Object.entries(tachesParEncadreur)
+          .map(([nom, count]) => `${nom} (${count})`)
+          .join(", ");
+
+        alertes.push({
+          type: "urgence",
+          message: `${tachesEnRetard.length} tâche(s) en retard`,
+          encadreur: encadreursAvecRetard,
+          action: "/superieur/taches"
+        });
+      }
+
+      // Alerte si un encadreur a une performance faible
+      const encadreursFaiblePerformance = performanceEncadreurs.filter(e => e.satisfaction < 60);
+      if (encadreursFaiblePerformance.length > 0) {
+        alertes.push({
+          type: "info",
+          message: `${encadreursFaiblePerformance.length} encadreur(s) avec performance faible`,
+          encadreur: encadreursFaiblePerformance.map(e => e.nom.split(' ')[0]).join(", "),
+          action: "/superieur/encadreurs"
+        });
+      }
+
+      // Calculer la satisfaction générale
+      const satisfactionGenerale = performanceEncadreurs.length > 0 
+        ? Math.round(performanceEncadreurs.reduce((acc, e) => acc + e.satisfaction, 0) / performanceEncadreurs.length)
+        : 0;
+
+      setDashboardData({
+        statsGlobales: {
+          totalStagiaires,
+          totalEncadreurs: encadreurs.length,
+          stagesActifs,
+          stagesTermines,
+          stagesEnAttente,
+          satisfactionGenerale
+        },
+        performanceEncadreurs: performanceEncadreurs.sort((a, b) => b.satisfaction - a.satisfaction),
+        alertes,
+        tachesEnRetard
+      });
+
+    } catch (error) {
+      console.error("Erreur lors du chargement du dashboard:", error);
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
   const getSatisfactionColor = (score) => {
     if (score >= 90) return 'text-emerald-600';
@@ -80,10 +270,10 @@ export default function SuperieurDashboard() {
   };
 
   const getSatisfactionBadge = (score) => {
-    if (score >= 90) return 'bg-emerald-100 text-emerald-700';
-    if (score >= 80) return 'bg-blue-100 text-blue-700';
-    if (score >= 70) return 'bg-amber-100 text-amber-700';
-    return 'bg-red-100 text-red-700';
+    if (score >= 90) return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+    if (score >= 80) return 'bg-blue-100 text-blue-700 border-blue-200';
+    if (score >= 70) return 'bg-amber-100 text-amber-700 border-amber-200';
+    return 'bg-red-100 text-red-700 border-red-200';
   };
 
   const getAlerteColor = (type) => {
@@ -97,12 +287,42 @@ export default function SuperieurDashboard() {
 
   const getAlerteIcon = (type) => {
     switch (type) {
-      case 'urgence': return <Activity className="h-4 w-4 text-red-600" />;
-      case 'warning': return <Target className="h-4 w-4 text-amber-600" />;
+      case 'urgence': return <AlertTriangle className="h-4 w-4 text-red-600" />;
+      case 'warning': return <Clock className="h-4 w-4 text-amber-600" />;
       case 'info': return <Eye className="h-4 w-4 text-blue-600" />;
       default: return <Star className="h-4 w-4 text-gray-600" />;
     }
   };
+
+  const handleExporterRapport = async () => {
+    try {
+      toast.success("Génération du rapport en cours...");
+      // Simulation d'export
+      setTimeout(() => {
+        toast.success("Rapport exporté avec succès");
+      }, 2000);
+    } catch (error) {
+      toast.error("Erreur lors de l'export du rapport");
+    }
+  };
+
+  const handleNavigation = (path) => {
+    console.log('Navigation vers:', path);
+    toast.success(`Redirection vers ${path}`);
+  };
+
+  const { statsGlobales, performanceEncadreurs, alertes } = dashboardData;
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement du tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -128,7 +348,10 @@ export default function SuperieurDashboard() {
               Vue consolidée de l'ensemble des encadreurs et stagiaires
             </p>
           </div>
-          <Button className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+          <Button 
+            onClick={handleExporterRapport}
+            className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+          >
             <Download className="h-4 w-4" />
             Exporter Rapport
           </Button>
@@ -171,7 +394,7 @@ export default function SuperieurDashboard() {
             count: statsGlobales.totalEncadreurs,
             text: "Équipe d'encadrement",
             gradient: "from-emerald-500 to-emerald-600",
-            evolution: "+2"
+            evolution: `${statsGlobales.totalEncadreurs}`
           },
           {
             title: "Stages Actifs",
@@ -186,7 +409,7 @@ export default function SuperieurDashboard() {
             count: statsGlobales.stagesActifs,
             text: "En cours de réalisation",
             gradient: "from-purple-500 to-purple-600",
-            evolution: "+5"
+            evolution: `${statsGlobales.stagesActifs}`
           },
           {
             title: "Satisfaction",
@@ -251,15 +474,21 @@ export default function SuperieurDashboard() {
             <CardContent className="space-y-4">
               {performanceEncadreurs.map((encadreur, index) => (
                 <motion.div
-                  key={encadreur.nom}
+                  key={encadreur.documentId}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="flex items-center justify-between p-3 rounded-lg bg-gray-50/50 dark:bg-gray-700/50 border border-gray-200/50 dark:border-gray-600/50"
+                  className="flex items-center justify-between p-3 rounded-lg bg-gray-50/50 dark:bg-gray-700/50 border border-gray-200/50 dark:border-gray-600/50 hover:shadow-md transition-all duration-200 cursor-pointer"
+                  onClick={() => handleNavigation(`/superieur/encadreurs/${encadreur.documentId}`)}
                 >
                   <div className="flex items-center gap-3 flex-1">
                     <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-semibold">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold ${
+                        index === 0 ? 'bg-gradient-to-r from-amber-500 to-amber-600' :
+                        index === 1 ? 'bg-gradient-to-r from-gray-500 to-gray-600' :
+                        index === 2 ? 'bg-gradient-to-r from-orange-500 to-orange-600' :
+                        'bg-gradient-to-r from-blue-500 to-purple-500'
+                      }`}>
                         {index + 1}
                       </div>
                     </div>
@@ -268,7 +497,7 @@ export default function SuperieurDashboard() {
                         {encadreur.nom}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {encadreur.stagiaires} stagiaires
+                        {encadreur.stagiaires} stagiaires • {encadreur.stages} stages
                       </p>
                     </div>
                   </div>
@@ -309,50 +538,63 @@ export default function SuperieurDashboard() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {alertes.map((alerte, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className={`p-4 rounded-lg border ${getAlerteColor(alerte.type)}`}
-                >
-                  <div className="flex items-start gap-3">
-                    {getAlerteIcon(alerte.type)}
-                    <div className="flex-1">
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        {alerte.message}
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        Encadreur: {alerte.encadreur}
-                      </p>
+              {alertes.length > 0 ? (
+                alertes.map((alerte, index) => (
+                  <motion.div
+                    key={index}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className={`p-4 rounded-lg border ${getAlerteColor(alerte.type)}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {getAlerteIcon(alerte.type)}
+                      <div className="flex-1">
+                        <p className="font-medium text-gray-900 dark:text-white">
+                          {alerte.message}
+                        </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                          Encadreur: {alerte.encadreur}
+                        </p>
+                      </div>
+                      <Button
+                        size="sm"
+                        className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                        onClick={() => handleNavigation(alerte.action)}
+                      >
+                        Agir
+                      </Button>
                     </div>
-                    <Button
-                      size="sm"
-                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                    >
-                      Agir
-                    </Button>
-                  </div>
-                </motion.div>
-              ))}
+                  </motion.div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <CheckCircle2 className="h-12 w-12 text-emerald-400 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">
+                    Aucune alerte prioritaire
+                  </p>
+                  <p className="text-sm text-gray-400 dark:text-gray-500">
+                    Toutes les activités sont dans les normes
+                  </p>
+                </div>
+              )}
 
               {/* Section statistiques rapides */}
               <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {statsGlobales.rapportsComplets}
+                    {statsGlobales.stagesTermines}
                   </div>
                   <div className="text-xs text-blue-600 dark:text-blue-400">
-                    Rapports validés
+                    Stages terminés
                   </div>
                 </div>
                 <div className="text-center p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
                   <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                    {statsGlobales.stagesTermines}
+                    {statsGlobales.stagesEnAttente}
                   </div>
                   <div className="text-xs text-emerald-600 dark:text-emerald-400">
-                    Stages terminés
+                    En attente
                   </div>
                 </div>
               </div>
@@ -379,18 +621,47 @@ export default function SuperieurDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: "Voir tous les encadreurs", icon: UserCheck, path: "/superieur/encadreurs", color: "blue" },
-                { label: "Rapports consolidés", icon: FileText, path: "/superieur/rapports", color: "emerald" },
-                { label: "Stages en cours", icon: Building, path: "/superieur/stage", color: "purple" },
-                { label: "Analytiques détaillées", icon: BarChart3, path: "/superieur/analytics", color: "amber" },
+                { 
+                  label: "Voir tous les encadreurs", 
+                  icon: UserCheck, 
+                  path: "/superieur/encadreurs", 
+                  color: "blue",
+                  count: statsGlobales.totalEncadreurs
+                },
+                { 
+                  label: "Validation des stages", 
+                  icon: FileText, 
+                  path: "/superieur/stage", 
+                  color: "emerald",
+                  count: statsGlobales.stagesEnAttente
+                },
+                { 
+                  label: "Stages en cours", 
+                  icon: Building, 
+                  path: "/superieur/stages", 
+                  color: "purple",
+                  count: statsGlobales.stagesActifs
+                },
+                { 
+                  label: "Analytiques détaillées", 
+                  icon: BarChart3, 
+                  path: "/superieur/analytics", 
+                  color: "amber",
+                  count: statsGlobales.totalStagiaires
+                },
               ].map((action, index) => (
                 <motion.button
                   key={action.label}
-                  className="flex flex-col items-center justify-center p-4 rounded-xl bg-gradient-to-br from-white to-gray-50 dark:from-gray-700 dark:to-gray-800 border border-gray-200/50 dark:border-gray-600/50 shadow-sm hover:shadow-md transition-all duration-200 group"
+                  className="relative flex flex-col items-center justify-center p-4 rounded-xl bg-gradient-to-br from-white to-gray-50 dark:from-gray-700 dark:to-gray-800 border border-gray-200/50 dark:border-gray-600/50 shadow-sm hover:shadow-md transition-all duration-200 group"
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
-                  onClick={() => console.log('Navigation vers:', action.path)}
+                  onClick={() => handleNavigation(action.path)}
                 >
+                  {action.count > 0 && (
+                    <Badge className="absolute -top-2 -right-2 bg-red-500 text-white">
+                      {action.count}
+                    </Badge>
+                  )}
                   <action.icon className={`h-8 w-8 mb-2 text-${action.color}-600 group-hover:scale-110 transition-transform`} />
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300 text-center">
                     {action.label}

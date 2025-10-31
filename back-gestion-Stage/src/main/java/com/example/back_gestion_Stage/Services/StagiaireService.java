@@ -103,6 +103,19 @@ public class StagiaireService extends BaseService<Stagiaire, StagiaireDTO> {
         if (dto.getDateNaissance() != null) entity.setDateNaissance(dto.getDateNaissance());
         if (dto.getAdresse() != null) entity.setAdresse(dto.getAdresse());
         if (dto.getStatut() != null) entity.setStatut(dto.getStatut());
+        
+            // MISE À JOUR DE L'ENCADREUR
+        if (dto.getEncadreurDocumentId() != null) {
+            // Si un nouveau documentId d'encadreur est fourni, on met à jour la relation
+            encadreurRepository.findByDocumentId(dto.getEncadreurDocumentId())
+                .ifPresent(entity::setEncadreur);
+        } else if (dto.getEncadreurDocumentId() == null && dto.getId() != null) {
+            // Si encadreurDocumentId est explicitement null, on supprime la relation
+            entity.setEncadreur(null);
+        }
+        // Si encadreurDocumentId n'est pas présent dans le DTO, on conserve la relation existante
+    
+    // Ne pas mettre à jour : id, documentId, createdAt, updatedAt, photo
         // Ne pas mettre à jour : id, documentId, createdAt, updatedAt, photo, encadreur
     }
 

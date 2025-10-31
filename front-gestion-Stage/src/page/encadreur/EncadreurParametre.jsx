@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   User,
@@ -11,7 +11,6 @@ import {
   Bell,
   Shield,
   Download,
-  Upload,
   Save,
   Edit,
   Camera,
@@ -19,7 +18,10 @@ import {
   Trash2,
   Settings,
   Eye,
-  EyeOff
+  EyeOff,
+  Users,
+  Target,
+  Briefcase
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +31,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -50,36 +54,6 @@ const cardVariants = {
       ease: "easeOut",
     },
   },
-};
-
-// Données de démonstration pour l'encadreur
-const donneesEncadreur = {
-  id: 1,
-  nom: "Dubois",
-  prenom: "Michel",
-  email: "michel.dubois@entreprise.com",
-  telephone: "+33 6 12 34 56 78",
-  poste: "Responsable Encadrement Stages",
-  service: "Ressources Humaines",
-  entreprise: "TechInnov Solutions",
-  adresse: "123 Avenue des Champs-Élysées",
-  ville: "Paris",
-  codePostal: "75008",
-  pays: "France",
-  dateEmbauche: "2020-03-15",
-  specialites: ["Développement Web", "Data Science", "Design UX/UI"],
-  bio: "Responsable de l'encadrement des stagiaires avec plus de 5 ans d'expérience dans le suivi pédagogique et professionnel.",
-  photo: null,
-  notifications: {
-    email: true,
-    push: true,
-    rappels: true,
-    nouveautes: false
-  },
-  securite: {
-    doubleAuth: false,
-    derniereConnexion: "2024-12-10T14:30:00"
-  }
 };
 
 // Composant Switch personnalisé
@@ -119,8 +93,9 @@ const CustomSwitch = ({ checked, onCheckedChange, id, label, description }) => (
 );
 
 export default function EncadreurParametre() {
-  const [encadreur, setEncadreur] = useState(donneesEncadreur);
+  const [encadreur, setEncadreur] = useState(null);
   const [modification, setModification] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [changementMotPasse, setChangementMotPasse] = useState({
     actuel: "",
     nouveau: "",
@@ -132,6 +107,40 @@ export default function EncadreurParametre() {
     confirmation: false
   });
 
+  // Configuration Axios
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les données de l'encadreur
+  const fetchEncadreurData = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer l'ID de l'encadreur connecté
+      const user = JSON.parse(localStorage.getItem("user"));
+      const encadreurId = user?.entityDocumentId;
+      
+      if (!encadreurId) {
+        toast.error("Impossible de récupérer les informations de l'encadreur");
+        return;
+      }
+
+      // Récupérer les données de l'encadreur
+      const response = await axios.get(`${API_BASE_URL}/encadreurs/${encadreurId}`);
+      if (response.data) {
+        setEncadreur(response.data);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des données encadreur:", error);
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchEncadreurData();
+  }, []);
+
   const handleInputChange = (field, value) => {
     setEncadreur(prev => ({
       ...prev,
@@ -139,74 +148,137 @@ export default function EncadreurParametre() {
     }));
   };
 
-  const handleSpecialiteChange = (index, value) => {
-    const nouvellesSpecialites = [...encadreur.specialites];
-    nouvellesSpecialites[index] = value;
-    setEncadreur(prev => ({
-      ...prev,
-      specialites: nouvellesSpecialites
-    }));
+  const handleSauvegarder = async () => {
+    try {
+      if (!encadreur) return;
+
+      await axios.put(`${API_BASE_URL}/encadreurs/${encadreur.documentId}`, {
+        id: encadreur.id,
+        nom: encadreur.nom,
+        prenom: encadreur.prenom,
+        email: encadreur.email,
+        telephone: encadreur.telephone,
+        cin: encadreur.cin,
+        fonction: encadreur.fonction,
+        departement: encadreur.departement,
+        specialite: encadreur.specialite,
+        statut: encadreur.statut
+      });
+
+      toast.success("Profil modifié avec succès");
+      setModification(false);
+      await fetchEncadreurData(); // Recharger les données
+    } catch (error) {
+      console.error("Erreur lors de la sauvegarde:", error);
+      toast.error("Erreur lors de la modification du profil");
+    }
   };
 
-  const ajouterSpecialite = () => {
-    setEncadreur(prev => ({
-      ...prev,
-      specialites: [...prev.specialites, ""]
-    }));
-  };
+  const handleChangerMotPasse = async () => {
+    try {
+      if (!encadreur) return;
 
-  const supprimerSpecialite = (index) => {
-    setEncadreur(prev => ({
-      ...prev,
-      specialites: prev.specialites.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleNotificationChange = (type, value) => {
-    setEncadreur(prev => ({
-      ...prev,
-      notifications: {
-        ...prev.notifications,
-        [type]: value
+      if (changementMotPasse.nouveau !== changementMotPasse.confirmation) {
+        toast.error("Les mots de passe ne correspondent pas");
+        return;
       }
-    }));
-  };
 
-  const handleSauvegarder = () => {
-    console.log('Sauvegarde des modifications:', encadreur);
-    setModification(false);
-    // Logique de sauvegarde vers l'API
-  };
+      if (changementMotPasse.nouveau.length < 6) {
+        toast.error("Le mot de passe doit contenir au moins 6 caractères");
+        return;
+      }
 
-  const handleChangerMotPasse = () => {
-    console.log('Changement de mot de passe:', changementMotPasse);
-    setChangementMotPasse({
-      actuel: "",
-      nouveau: "",
-      confirmation: ""
-    });
-    // Logique de changement de mot de passe
+      // Utiliser l'endpoint de changement de mot de passe des comptes
+      await axios.put(`${API_BASE_URL}/comptes-utilisateurs/${encadreur.documentId}/password`, {
+        newPassword: changementMotPasse.nouveau
+      });
+
+      toast.success("Mot de passe modifié avec succès");
+      setChangementMotPasse({
+        actuel: "",
+        nouveau: "",
+        confirmation: ""
+      });
+    } catch (error) {
+      console.error("Erreur lors du changement de mot de passe:", error);
+      toast.error("Erreur lors du changement de mot de passe");
+    }
   };
 
   const handleExportDonnees = () => {
     console.log('Export des données');
+    toast.success("Export des données en cours...");
     // Logique d'export des données
   };
 
-  const handleSupprimerCompte = () => {
-    if (window.confirm("Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.")) {
-      console.log('Suppression du compte');
-      // Logique de suppression du compte
+  const handleSupprimerCompte = async () => {
+    if (!window.confirm("Êtes-vous sûr de vouloir supprimer votre compte ? Cette action est irréversible.")) {
+      return;
+    }
+
+    try {
+      if (!encadreur) return;
+
+      await axios.delete(`${API_BASE_URL}/encadreurs/${encadreur.documentId}`);
+      toast.success("Compte supprimé avec succès");
+      // Redirection vers la page de login ou autre
+    } catch (error) {
+      console.error("Erreur lors de la suppression:", error);
+      toast.error("Erreur lors de la suppression du compte");
     }
   };
 
   const formatDate = (dateString) => {
+    if (!dateString) return "N/A";
     return new Date(dateString).toLocaleDateString("fr-FR", {
       day: "numeric",
       month: "long",
       year: "numeric"
     });
   };
+
+  const getInitials = (prenom, nom) => {
+    if (!prenom && !nom) return "E";
+    const firstInitial = prenom ? prenom.charAt(0).toUpperCase() : "";
+    const lastInitial = nom ? nom.charAt(0).toUpperCase() : "";
+    return firstInitial + lastInitial;
+  };
+
+  const getAvatarColor = (name) => {
+    const colors = [
+      "bg-gradient-to-r from-blue-600 to-purple-600",
+      "bg-gradient-to-r from-indigo-600 to-purple-600",
+      "bg-gradient-to-r from-blue-600 to-indigo-600",
+      "bg-gradient-to-r from-purple-600 to-blue-600",
+    ];
+    if (!name) return colors[0];
+    const index = name.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des paramètres...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!encadreur) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Aucune donnée encadreur trouvée</p>
+        </div>
+      </div>
+    );
+  }
+
+  const initials = getInitials(encadreur.prenom, encadreur.nom);
+  const avatarColor = getAvatarColor(encadreur.nom);
 
   return (
     <motion.div
@@ -216,6 +288,21 @@ export default function EncadreurParametre() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -226,7 +313,7 @@ export default function EncadreurParametre() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Paramètres du Compte
+              Paramètres du Compte Encadreur
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-lg">
               Gérez vos informations personnelles et préférences
@@ -237,7 +324,10 @@ export default function EncadreurParametre() {
               <>
                 <Button
                   variant="outline"
-                  onClick={() => setModification(false)}
+                  onClick={() => {
+                    setModification(false);
+                    fetchEncadreurData(); // Recharger les données originales
+                  }}
                   className="border-gray-300 dark:border-gray-600"
                 >
                   Annuler
@@ -300,8 +390,9 @@ export default function EncadreurParametre() {
                       {/* Photo de profil */}
                       <div className="relative">
                         <Avatar className="h-24 w-24 border-4 border-white/20 shadow-lg">
-                          <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xl">
-                            {encadreur.prenom[0]}{encadreur.nom[0]}
+                          <AvatarImage src={encadreur.photoUrl} />
+                          <AvatarFallback className={`${avatarColor} text-white text-xl`}>
+                            {initials}
                           </AvatarFallback>
                         </Avatar>
                         {modification && (
@@ -316,7 +407,7 @@ export default function EncadreurParametre() {
                           {encadreur.prenom} {encadreur.nom}
                         </h3>
                         <p className="text-gray-600 dark:text-gray-400">
-                          {encadreur.poste}
+                          {encadreur.fonction}
                         </p>
                         <Badge className="mt-2 bg-gradient-to-r from-blue-500 to-purple-500 text-white">
                           Encadreur
@@ -327,31 +418,35 @@ export default function EncadreurParametre() {
                 </Card>
               </motion.div>
 
-              {/* Informations de l'entreprise */}
+              {/* Informations professionnelles */}
               <motion.div variants={cardVariants}>
                 <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                      <Building className="h-5 w-5" />
-                      Entreprise
+                      <Briefcase className="h-5 w-5" />
+                      Informations Professionnelles
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div>
                       <p className="font-medium text-gray-900 dark:text-white">
-                        {encadreur.entreprise}
+                        {encadreur.departement || "Non spécifié"}
                       </p>
                       <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {encadreur.service}
+                        Département
                       </p>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>{encadreur.ville}, {encadreur.pays}</span>
+                      <Target className="h-4 w-4" />
+                      <span>{encadreur.specialite || "Non spécifié"}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                      <Users className="h-4 w-4" />
+                      <span>Stagiaires encadrés</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                       <Calendar className="h-4 w-4" />
-                      <span>Depuis {formatDate(encadreur.dateEmbauche)}</span>
+                      <span>Créé le {formatDate(encadreur.createdAt)}</span>
                     </div>
                   </CardContent>
                 </Card>
@@ -375,19 +470,19 @@ export default function EncadreurParametre() {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="prenom">Prénom</Label>
+                        <Label htmlFor="prenom">Prénom *</Label>
                         <Input
                           id="prenom"
-                          value={encadreur.prenom}
+                          value={encadreur.prenom || ""}
                           onChange={(e) => handleInputChange('prenom', e.target.value)}
                           disabled={!modification}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="nom">Nom</Label>
+                        <Label htmlFor="nom">Nom *</Label>
                         <Input
                           id="nom"
-                          value={encadreur.nom}
+                          value={encadreur.nom || ""}
                           onChange={(e) => handleInputChange('nom', e.target.value)}
                           disabled={!modification}
                         />
@@ -396,84 +491,101 @@ export default function EncadreurParametre() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                        <Label htmlFor="email">Email *</Label>
                         <Input
                           id="email"
                           type="email"
-                          value={encadreur.email}
+                          value={encadreur.email || ""}
                           onChange={(e) => handleInputChange('email', e.target.value)}
                           disabled={!modification}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="telephone">Téléphone</Label>
+                        <Label htmlFor="telephone">Téléphone *</Label>
                         <Input
                           id="telephone"
-                          value={encadreur.telephone}
+                          value={encadreur.telephone || ""}
                           onChange={(e) => handleInputChange('telephone', e.target.value)}
                           disabled={!modification}
                         />
                       </div>
                     </div>
 
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="cin">CIN *</Label>
+                        <Input
+                          id="cin"
+                          value={encadreur.cin || ""}
+                          onChange={(e) => handleInputChange('cin', e.target.value)}
+                          disabled={!modification}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="fonction">Fonction *</Label>
+                        <Input
+                          id="fonction"
+                          value={encadreur.fonction || ""}
+                          onChange={(e) => handleInputChange('fonction', e.target.value)}
+                          disabled={!modification}
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="poste">Poste</Label>
-                      <Input
-                        id="poste"
-                        value={encadreur.poste}
-                        onChange={(e) => handleInputChange('poste', e.target.value)}
-                        disabled={!modification}
-                      />
+                      <Label htmlFor="statut">Statut</Label>
+                      <div className="flex items-center gap-4">
+                        <Badge className={encadreur.statut === 'ACTIF' 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : 'bg-red-100 text-red-700'
+                        }>
+                          {encadreur.statut === 'ACTIF' ? 'Actif' : 'Inactif'}
+                        </Badge>
+                        {modification && (
+                          <select
+                            value={encadreur.statut}
+                            onChange={(e) => handleInputChange('statut', e.target.value)}
+                            className="px-3 py-1 border rounded-md"
+                          >
+                            <option value="ACTIF">Actif</option>
+                            <option value="INACTIF">Inactif</option>
+                          </select>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
               </motion.div>
 
-              {/* Adresse */}
+              {/* Informations professionnelles détaillées */}
               <motion.div variants={cardVariants}>
                 <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                      <MapPin className="h-5 w-5" />
-                      Adresse
+                      <Building className="h-5 w-5" />
+                      Informations Professionnelles
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="adresse">Adresse</Label>
-                      <Input
-                        id="adresse"
-                        value={encadreur.adresse}
-                        onChange={(e) => handleInputChange('adresse', e.target.value)}
-                        disabled={!modification}
-                      />
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="ville">Ville</Label>
+                        <Label htmlFor="departement">Département</Label>
                         <Input
-                          id="ville"
-                          value={encadreur.ville}
-                          onChange={(e) => handleInputChange('ville', e.target.value)}
+                          id="departement"
+                          value={encadreur.departement || ""}
+                          onChange={(e) => handleInputChange('departement', e.target.value)}
                           disabled={!modification}
+                          placeholder="Votre département"
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="codePostal">Code Postal</Label>
+                        <Label htmlFor="specialite">Spécialité</Label>
                         <Input
-                          id="codePostal"
-                          value={encadreur.codePostal}
-                          onChange={(e) => handleInputChange('codePostal', e.target.value)}
+                          id="specialite"
+                          value={encadreur.specialite || ""}
+                          onChange={(e) => handleInputChange('specialite', e.target.value)}
                           disabled={!modification}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="pays">Pays</Label>
-                        <Input
-                          id="pays"
-                          value={encadreur.pays}
-                          onChange={(e) => handleInputChange('pays', e.target.value)}
-                          disabled={!modification}
+                          placeholder="Votre domaine de spécialisation"
                         />
                       </div>
                     </div>
@@ -481,63 +593,43 @@ export default function EncadreurParametre() {
                 </Card>
               </motion.div>
 
-              {/* Spécialités et Bio */}
+              {/* Informations système */}
               <motion.div variants={cardVariants}>
                 <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
                   <CardHeader>
-                    <CardTitle>Spécialités et Description</CardTitle>
-                    <CardDescription>
-                      Vos domaines d'expertise et présentation personnelle
-                    </CardDescription>
+                    <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
+                      <Settings className="h-5 w-5" />
+                      Informations Système
+                    </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>Spécialités</Label>
-                      <div className="space-y-2">
-                        {encadreur.specialites.map((specialite, index) => (
-                          <div key={index} className="flex gap-2">
-                            <Input
-                              value={specialite}
-                              onChange={(e) => handleSpecialiteChange(index, e.target.value)}
-                              disabled={!modification}
-                              placeholder="Domaine d'expertise"
-                            />
-                            {modification && encadreur.specialites.length > 1 && (
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600 hover:text-red-700 border-red-300"
-                                onClick={() => supprimerSpecialite(index)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
-                        {modification && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={ajouterSpecialite}
-                            className="w-full border-gray-300 dark:border-gray-600"
-                          >
-                            + Ajouter une spécialité
-                          </Button>
-                        )}
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">ID Document</p>
+                        <p className="text-sm text-gray-900 dark:text-white font-mono">
+                          {encadreur.documentId}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">ID Technique</p>
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {encadreur.id}
+                        </p>
                       </div>
                     </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="bio">Biographie</Label>
-                      <Textarea
-                        id="bio"
-                        value={encadreur.bio}
-                        onChange={(e) => handleInputChange('bio', e.target.value)}
-                        disabled={!modification}
-                        rows={4}
-                        placeholder="Présentez-vous et vos expériences..."
-                      />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Date de création</p>
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {formatDate(encadreur.createdAt)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Dernière modification</p>
+                        <p className="text-sm text-gray-900 dark:text-white">
+                          {formatDate(encadreur.updatedAt)}
+                        </p>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -568,32 +660,48 @@ export default function EncadreurParametre() {
                 <CardContent className="space-y-6">
                   <CustomSwitch
                     id="notifications-email"
-                    checked={encadreur.notifications.email}
-                    onCheckedChange={(checked) => handleNotificationChange('email', checked)}
+                    checked={true}
+                    onCheckedChange={() => {}}
                     label="Notifications par email"
                     description="Recevoir les notifications importantes par email"
                   />
 
                   <CustomSwitch
                     id="notifications-push"
-                    checked={encadreur.notifications.push}
-                    onCheckedChange={(checked) => handleNotificationChange('push', checked)}
+                    checked={true}
+                    onCheckedChange={() => {}}
                     label="Notifications push"
                     description="Notifications en temps réel sur la plateforme"
                   />
 
                   <CustomSwitch
-                    id="notifications-rappels"
-                    checked={encadreur.notifications.rappels}
-                    onCheckedChange={(checked) => handleNotificationChange('rappels', checked)}
-                    label="Rappels automatiques"
-                    description="Rappels pour les échéances et entretiens"
+                    id="notifications-stagiaires"
+                    checked={true}
+                    onCheckedChange={() => {}}
+                    label="Activités des stagiaires"
+                    description="Suivi des activités de vos stagiaires"
+                  />
+
+                  <CustomSwitch
+                    id="notifications-taches"
+                    checked={true}
+                    onCheckedChange={() => {}}
+                    label="Nouvelles tâches"
+                    description="Alertes pour les nouvelles tâches assignées"
+                  />
+
+                  <CustomSwitch
+                    id="notifications-rapports"
+                    checked={true}
+                    onCheckedChange={() => {}}
+                    label="Rapports et statistiques"
+                    description="Rapports périodiques sur vos stagiaires"
                   />
 
                   <CustomSwitch
                     id="notifications-nouveautes"
-                    checked={encadreur.notifications.nouveautes}
-                    onCheckedChange={(checked) => handleNotificationChange('nouveautes', checked)}
+                    checked={false}
+                    onCheckedChange={() => {}}
                     label="Nouvelles fonctionnalités"
                     description="Être informé des nouvelles fonctionnalités"
                   />
@@ -663,7 +771,7 @@ export default function EncadreurParametre() {
                           ...prev,
                           nouveau: e.target.value
                         }))}
-                        placeholder="Nouveau mot de passe"
+                        placeholder="Nouveau mot de passe (min. 6 caractères)"
                       />
                       <Button
                         type="button"
@@ -711,6 +819,7 @@ export default function EncadreurParametre() {
                   <Button
                     onClick={handleChangerMotPasse}
                     className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                    disabled={!changementMotPasse.nouveau || !changementMotPasse.confirmation}
                   >
                     <Lock className="h-4 w-4" />
                     Changer le mot de passe
@@ -719,7 +828,7 @@ export default function EncadreurParametre() {
               </Card>
             </motion.div>
 
-            {/* Authentification à deux facteurs */}
+            {/* Informations de sécurité */}
             <motion.div variants={cardVariants}>
               <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
                 <CardHeader>
@@ -729,30 +838,21 @@ export default function EncadreurParametre() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white">
-                        Authentification à deux facteurs
-                      </p>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        Ajoutez une couche de sécurité supplémentaire à votre compte
-                      </p>
-                    </div>
-                    <CustomSwitch
-                      id="double-auth"
-                      checked={encadreur.securite.doubleAuth}
-                      onCheckedChange={(checked) => setEncadreur(prev => ({
-                        ...prev,
-                        securite: { ...prev.securite, doubleAuth: checked }
-                      }))}
-                      label=""
-                      description=""
-                    />
-                  </div>
-
                   <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <p className="text-sm text-blue-700 dark:text-blue-300">
-                      <strong>Dernière connexion :</strong> {formatDate(encadreur.securite.derniereConnexion)}
+                      <strong>Dernière connexion :</strong> {formatDate(encadreur.updatedAt)}
+                    </p>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      <strong>Statut du compte :</strong>{" "}
+                      <Badge className={encadreur.statut === 'ACTIF' 
+                        ? 'bg-emerald-100 text-emerald-700' 
+                        : 'bg-red-100 text-red-700'
+                      }>
+                        {encadreur.statut === 'ACTIF' ? 'Actif' : 'Inactif'}
+                      </Badge>
+                    </p>
+                    <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                      <strong>Rôle :</strong> Encadreur
                     </p>
                   </div>
                 </CardContent>
@@ -783,7 +883,7 @@ export default function EncadreurParametre() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Vous pouvez demander l'export de toutes vos données personnelles stockées sur notre plateforme.
+                    Vous pouvez demander l'export de toutes vos données personnelles stockées sur notre plateforme, y compris vos informations de profil, historique d'encadrement et données professionnelles.
                   </p>
                   <Button
                     onClick={handleExportDonnees}
@@ -812,7 +912,7 @@ export default function EncadreurParametre() {
                 <CardContent className="space-y-4">
                   <div>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      La suppression de votre compte est définitive. Toutes vos données, y compris les informations sur les stagiaires et les rapports, seront supprimées.
+                      La suppression de votre compte est définitive. Toutes vos données, y compris les informations d'encadrement des stagiaires, seront supprimées de manière irréversible.
                     </p>
                     <Button
                       onClick={handleSupprimerCompte}

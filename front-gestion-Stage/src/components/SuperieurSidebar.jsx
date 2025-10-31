@@ -19,6 +19,7 @@ import {
   UserCog,
   Building
 } from "lucide-react";
+import { motion } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import axios from "axios";
 
@@ -41,9 +42,14 @@ export default function SuperieurSidebar({
     email: "",
     photoUrl: null
   });
+  const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Configuration API
+  const API_BASE_URL = "http://localhost:9090/api";
 
   useEffect(() => {
     const root = document.documentElement;
@@ -56,46 +62,124 @@ export default function SuperieurSidebar({
     }
   }, [darkMode]);
 
-  useEffect(() => {
-    const fetchSuperieurData = async () => {
-      try {
-        const user = JSON.parse(localStorage.getItem("user"));
+  // Fonction pour récupérer le compte utilisateur
+  const getCurrentUserAndAccount = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (!user || !user.entityDocumentId) {
+        return null;
+      }
+
+      // Récupérer le compte utilisateur associé au supérieur hiérarchique
+      const compteResponse = await axios.get(
+        `${API_BASE_URL}/comptes-utilisateurs/entity/${user.entityDocumentId}/type/SUPERIEUR_HIERARCHIQUE`
+      );
+      
+      return compteResponse.data;
+    } catch (error) {
+      console.error("Erreur récupération compte supérieur:", error);
+      return null;
+    }
+  };
+
+  // Charger le nombre de notifications non lues
+  const loadNotificationCount = async () => {
+    try {
+      setNotificationsLoading(true);
+      const compteUtilisateur = await getCurrentUserAndAccount();
+      if (!compteUtilisateur) {
+        setNotificationCount(0);
+        return;
+      }
+
+      const response = await axios.get(
+        `${API_BASE_URL}/notifications/compte/${compteUtilisateur.documentId}/count-non-lues`
+      );
+      
+      setNotificationCount(response.data || 0);
+    } catch (error) {
+      console.error("Erreur chargement compteur notifications supérieur:", error);
+      setNotificationCount(0);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  // Charger les données du supérieur hiérarchique
+  const fetchSuperieurData = async () => {
+    try {
+      setLoading(true);
+      const user = JSON.parse(localStorage.getItem("user"));
+      
+      if (user && user.entityDocumentId) {
+        const response = await axios.get(`http://localhost:9090/api/superieurs-hierarchiques/${user.entityDocumentId}`);
+        const superieurData = response.data;
         
-        if (user && user.entityDocumentId) {
-          const response = await axios.get(`http://localhost:9090/api/superieurs-hierarchiques/${user.entityDocumentId}`);
-          const superieurData = response.data;
-          
-          setSuperieurInfo({
-            nom: superieurData.nom || "Supérieur",
-            prenom: superieurData.prenom || "",
-            email: superieurData.email || "",
-            photoUrl: superieurData.photoUrl || null
-          });
-        } else {
-          const userData = JSON.parse(localStorage.getItem("user") || "{}");
-          setSuperieurInfo({
-            nom: "Supérieur",
-            prenom: "",
-            email: userData.email || "",
-            photoUrl: null
-          });
-        }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des données supérieur:", error);
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        setSuperieurInfo({
+          nom: superieurData.nom || "Supérieur",
+          prenom: superieurData.prenom || "",
+          email: superieurData.email || "",
+          photoUrl: superieurData.photoUrl || null
+        });
+      } else {
+        const userData = JSON.parse(localStorage.getItem("user") || "{}");
         setSuperieurInfo({
           nom: "Supérieur",
           prenom: "",
-          email: user.email || "",
+          email: userData.email || "",
           photoUrl: null
         });
-      } finally {
-        setLoading(false);
       }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des données supérieur:", error);
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      setSuperieurInfo({
+        nom: "Supérieur",
+        prenom: "",
+        email: user.email || "",
+        photoUrl: null
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Charger les données au montage
+  useEffect(() => {
+    fetchSuperieurData();
+    loadNotificationCount();
+  }, []);
+
+  // Mettre à jour le compteur quand la page redevient active
+  useEffect(() => {
+    const handleFocus = () => {
+      loadNotificationCount();
     };
 
-    fetchSuperieurData();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
+
+  // Polling pour les notifications (toutes les 30 secondes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadNotificationCount();
+    }, 30000); // 30 secondes
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Recharger les notifications quand on navigue vers la page des notifications
+  useEffect(() => {
+    if (location.pathname === "/superieur/notifications") {
+      // Recharger le compteur après un délai pour laisser le temps à la page de traiter les notifications
+      setTimeout(() => {
+        loadNotificationCount();
+      }, 1000);
+    }
+  }, [location.pathname]);
 
   const getInitials = (prenom, nom) => {
     if (!prenom && !nom) return "SH";
@@ -128,6 +212,30 @@ export default function SuperieurSidebar({
     navigate("/login");
   };
 
+  // Composant Badge de notification animé
+  const NotificationBadge = ({ count, loading }) => {
+    if (loading) {
+      return (
+        <span className="absolute -top-2 -right-2 bg-gray-400 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+          <div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
+        </span>
+      );
+    }
+
+    if (count <= 0) return null;
+    
+    return (
+      <motion.span 
+        className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center shadow-lg"
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 500, damping: 15 }}
+      >
+        {count > 9 ? "9+" : count}
+      </motion.span>
+    );
+  };
+
   const menuItems = [
     {
       label: "Tableau de Bord",
@@ -154,9 +262,7 @@ export default function SuperieurSidebar({
       icon: (
         <div className="relative">
           <Bell className="w-5 h-5" />
-          <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-            5
-          </span>
+          <NotificationBadge count={notificationCount} loading={notificationsLoading} />
         </div>
       ), 
       path: "/superieur/notifications" 
@@ -230,6 +336,15 @@ export default function SuperieurSidebar({
                     {superieurInfo.email}
                   </span>
                 )}
+                {/* Badge de notification dans le header */}
+                {!collapsed && notificationCount > 0 && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                      {notificationCount} notification{notificationCount > 1 ? 's' : ''} non lue{notificationCount > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -245,11 +360,19 @@ export default function SuperieurSidebar({
 
         {/* Menu */}
         <nav className="mt-4 px-2 space-y-1 flex-1 overflow-auto">
-          {menuItems.map((item, index) => (
+          {menuItems.map((item) => (
             <Link
               key={item.label}
               to={item.path}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => {
+                setMobileOpen(false);
+                // Recharger les notifications quand on clique sur le menu notifications
+                if (item.path === "/superieur/notifications") {
+                  setTimeout(() => {
+                    loadNotificationCount();
+                  }, 500);
+                }
+              }}
               className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
                 location.pathname.startsWith(item.path)
                   ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
@@ -268,6 +391,12 @@ export default function SuperieurSidebar({
                   {item.label === "Encadreurs" && (
                     <span className="bg-emerald-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                       N
+                    </span>
+                  )}
+                  {/* Badge supplémentaire dans le texte pour les notifications */}
+                  {item.label === "Notifications" && notificationCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-6 text-center">
+                      {notificationCount > 9 ? "9+" : notificationCount}
                     </span>
                   )}
                 </div>

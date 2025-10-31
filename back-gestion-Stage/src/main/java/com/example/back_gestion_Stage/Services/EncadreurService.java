@@ -100,6 +100,14 @@ public class EncadreurService extends BaseService<Encadreur, EncadreurDTO> {
         if (dto.getDepartement() != null) entity.setDepartement(dto.getDepartement());
         if (dto.getSpecialite() != null) entity.setSpecialite(dto.getSpecialite());
         if (dto.getStatut() != null) entity.setStatut(dto.getStatut());
+        if (dto.getSuperieurHierarchiqueDocumentId() != null) {
+            // Si un nouveau documentId de superviseur est fourni, on met à jour la relation
+            superieurHierarchiqueRepository.findByDocumentId(dto.getSuperieurHierarchiqueDocumentId())
+                .ifPresent(entity::setSuperieurHierarchique);
+        } else {
+            // Si le superviseur est null dans le DTO, on supprime la relation
+            entity.setSuperieurHierarchique(null);
+        }
         // Ne pas mettre à jour : id, documentId, createdAt, updatedAt, photo, superieurHierarchique
     }
 

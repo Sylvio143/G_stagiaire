@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Calendar,
@@ -15,7 +15,8 @@ import {
   CheckCircle,
   PlayCircle,
   FileText,
-  BarChart3
+  BarChart3,
+  Users
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -51,93 +54,193 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration pour les stages du stagiaire
-const stagesData = [
-  {
-    id: 1,
-    titre: "Stage Développement Fullstack",
-    entreprise: "TechCorp Solutions",
-    type: "Stage de fin d'études",
-    duree: "6 mois",
-    dateDebut: "2024-09-01",
-    dateFin: "2025-02-28",
-    ville: "Paris",
-    statut: "En cours",
-    progression: 75,
-    encadreur: "Thomas Leroy",
-    competences: ["React", "Node.js", "MongoDB", "TypeScript"],
-    description: "Stage passionnant dans le développement d'applications web modernes avec les dernières technologies.",
-    tachesEnCours: 3,
-    tachesTerminees: 12,
-    objectifsAtteints: 8,
-    totalObjectifs: 10,
-    dernierRapport: "2024-12-01",
-    prochainRapport: "2024-12-15"
-  },
-  {
-    id: 2,
-    titre: "Stage Design UX/UI",
-    entreprise: "CreativeLab Studio",
-    type: "Stage professionnel",
-    duree: "4 mois",
-    dateDebut: "2023-10-15",
-    dateFin: "2024-02-15",
-    ville: "Lyon",
-    statut: "Terminé",
-    progression: 100,
-    encadreur: "Sophie Martin",
-    competences: ["Figma", "Prototypage", "Recherche Utilisateur", "Design System"],
-    description: "Opportunité unique pour apprendre le design d'expérience utilisateur dans une agence renommée.",
-    tachesEnCours: 0,
-    tachesTerminees: 18,
-    objectifsAtteints: 12,
-    totalObjectifs: 12,
-    dernierRapport: "2024-02-10",
-    prochainRapport: null
-  },
-  {
-    id: 3,
-    titre: "Stage Data Science",
-    entreprise: "DataInnov Analytics",
-    type: "Stage de recherche",
-    duree: "5 mois",
-    dateDebut: "2024-03-20",
-    dateFin: "2024-08-20",
-    ville: "Marseille",
-    statut: "En attente",
-    progression: 0,
-    encadreur: "Pierre Bernard",
-    competences: ["Python", "Machine Learning", "Data Visualization", "SQL"],
-    description: "Stage axé sur l'analyse de données et le machine learning pour résoudre des problèmes business complexes.",
-    tachesEnCours: 0,
-    tachesTerminees: 0,
-    objectifsAtteints: 0,
-    totalObjectifs: 8,
-    dernierRapport: null,
-    prochainRapport: "2024-03-25"
-  }
-];
-
 export default function StagiaireStage() {
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [recherche, setRecherche] = useState("");
-  const [stages, setStages] = useState(stagesData);
+  const [stages, setStages] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const getStatutColor = (statut) => {
-    switch (statut) {
-      case 'En cours': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
-      case 'Terminé': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
-      case 'En attente': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
-      case 'Annulé': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
+  // Configuration API
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les stages du stagiaire connecté
+  const fetchStages = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer l'ID du stagiaire connecté
+      const user = JSON.parse(localStorage.getItem("user"));
+      const stagiaireId = user?.entityDocumentId;
+      
+      if (!stagiaireId) {
+        toast.error("Impossible de récupérer les informations du stagiaire");
+        return;
+      }
+
+      // Récupérer les stages du stagiaire
+      const response = await axios.get(`${API_BASE_URL}/stages/stagiaire/${stagiaireId}`);
+      const stagesStagiaire = response.data;
+
+      // Enrichir les données des stages
+      const stagesEnrichis = await Promise.all(
+        stagesStagiaire.map(async (stage) => {
+          try {
+            // Récupérer les détails complets du stage avec relations
+            const stageDetailResponse = await axios.get(`${API_BASE_URL}/stages/${stage.documentId}`);
+            const stageDetail = stageDetailResponse.data;
+
+            // Récupérer les tâches du stage
+            let taches = [];
+            let tachesTerminees = 0;
+            let tachesEnCours = 0;
+            try {
+              const tachesResponse = await axios.get(`${API_BASE_URL}/taches/stage/${stage.documentId}`);
+              taches = tachesResponse.data;
+              tachesTerminees = taches.filter(tache => tache.statut === 'TERMINEE').length;
+              tachesEnCours = taches.filter(tache => tache.statut === 'EN_COURS' || tache.statut === 'A_FAIRE').length;
+            } catch (error) {
+              console.error("Erreur récupération tâches:", error);
+            }
+
+            // Récupérer les informations de l'encadreur
+            let encadreurNom = "Non assigné";
+            if (stageDetail.encadreurDocumentId) {
+              try {
+                const encadreurResponse = await axios.get(`${API_BASE_URL}/encadreurs/${stageDetail.encadreurDocumentId}`);
+                const encadreur = encadreurResponse.data;
+                encadreurNom = `${encadreur.prenom} ${encadreur.nom}`;
+              } catch (error) {
+                console.error("Erreur récupération encadreur:", error);
+              }
+            }
+
+            // Récupérer les informations du supérieur hiérarchique
+            let entreprise = "Entreprise non spécifiée";
+            if (stageDetail.superieurHierarchiqueDocumentId) {
+              try {
+                const superieurResponse = await axios.get(`${API_BASE_URL}/superieurs-hierarchiques/${stageDetail.superieurHierarchiqueDocumentId}`);
+                const superieur = superieurResponse.data;
+                entreprise = superieur.departement || "Entreprise non spécifiée";
+              } catch (error) {
+                console.error("Erreur récupération supérieur:", error);
+              }
+            }
+
+            // Calculer la progression basée sur les dates
+            const maintenant = new Date();
+            const dateDebut = new Date(stageDetail.dateDebut);
+            const dateFin = new Date(stageDetail.dateFin);
+            const dureeTotale = dateFin - dateDebut;
+            const tempsEcoule = maintenant - dateDebut;
+            
+            let progression = 0;
+            if (stageDetail.statutStage === 'TERMINE') {
+              progression = 100;
+            } else if (stageDetail.statutStage === 'EN_COURS' && dureeTotale > 0) {
+              progression = Math.min(100, Math.max(0, (tempsEcoule / dureeTotale) * 100));
+            }
+
+            // Calculer le nombre de jours restants
+            const joursRestants = Math.ceil((dateFin - maintenant) / (1000 * 60 * 60 * 24));
+
+            return {
+              ...stageDetail,
+              encadreurNom,
+              entreprise,
+              progression: Math.round(progression),
+              tachesTotal: taches.length,
+              tachesTerminees,
+              tachesEnCours,
+              joursRestants: Math.max(0, joursRestants),
+              duree: calculerDuree(stageDetail.dateDebut, stageDetail.dateFin),
+              competences: ["Développement", "Collaboration", "Analyse"], // À adapter selon les besoins
+              type: getTypeStage(stageDetail.statutStage)
+            };
+          } catch (error) {
+            console.error("Erreur enrichissement stage:", error);
+            return {
+              ...stage,
+              encadreurNom: "Non assigné",
+              entreprise: "Entreprise non spécifiée",
+              progression: 0,
+              tachesTotal: 0,
+              tachesTerminees: 0,
+              tachesEnCours: 0,
+              joursRestants: 0,
+              duree: "Non spécifiée",
+              competences: [],
+              type: "Stage"
+            };
+          }
+        })
+      );
+
+      setStages(stagesEnrichis);
+    } catch (error) {
+      console.error("Erreur lors du chargement des stages:", error);
+      toast.error("Erreur lors du chargement des stages");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction utilitaire pour calculer la durée
+  const calculerDuree = (dateDebut, dateFin) => {
+    const debut = new Date(dateDebut);
+    const fin = new Date(dateFin);
+    const diffTime = Math.abs(fin - debut);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const mois = Math.floor(diffDays / 30);
+    
+    if (mois > 0) {
+      return `${mois} mois`;
+    }
+    return `${diffDays} jours`;
+  };
+
+  // Fonction pour déterminer le type de stage
+  const getTypeStage = (statutStage) => {
+    switch (statutStage) {
+      case 'EN_ATTENTE_VALIDATION': return 'En attente de validation';
+      case 'VALIDE': return 'Stage validé';
+      case 'EN_COURS': return 'Stage en cours';
+      case 'TERMINE': return 'Stage terminé';
+      case 'REFUSE': return 'Stage refusé';
+      default: return 'Stage';
+    }
+  };
+
+  useEffect(() => {
+    fetchStages();
+  }, []);
+
+  const getStatutColor = (statutStage) => {
+    switch (statutStage) {
+      case 'VALIDE': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'REFUSE': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
+      case 'EN_ATTENTE_VALIDATION': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
+      case 'EN_COURS': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
+      case 'TERMINE': return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+    }
+  };
+
+  const getStatutLabel = (statutStage) => {
+    switch (statutStage) {
+      case 'VALIDE': return 'Validé';
+      case 'REFUSE': return 'Refusé';
+      case 'EN_ATTENTE_VALIDATION': return 'En attente';
+      case 'EN_COURS': return 'En cours';
+      case 'TERMINE': return 'Terminé';
+      default: return statutStage;
     }
   };
 
   const getTypeColor = (type) => {
     switch (type) {
-      case 'Stage de fin d\'études': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300';
-      case 'Stage professionnel': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300';
-      case 'Stage de recherche': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300';
+      case 'Stage en cours': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300';
+      case 'Stage validé': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300';
+      case 'Stage terminé': return 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300';
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
     }
   };
@@ -151,11 +254,11 @@ export default function StagiaireStage() {
 
   const stagesFiltres = stages.filter(stage => {
     const correspondRecherche = 
-      stage.titre.toLowerCase().includes(recherche.toLowerCase()) ||
-      stage.entreprise.toLowerCase().includes(recherche.toLowerCase()) ||
-      stage.ville.toLowerCase().includes(recherche.toLowerCase());
+      stage.titre?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stage.entreprise?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stage.description?.toLowerCase().includes(recherche.toLowerCase());
     
-    const correspondStatut = filtreStatut === "tous" || stage.statut === filtreStatut;
+    const correspondStatut = filtreStatut === "tous" || stage.statutStage === filtreStatut;
     
     return correspondRecherche && correspondStatut;
   });
@@ -171,7 +274,7 @@ export default function StagiaireStage() {
   };
 
   const handleContacterEncadreur = (stage) => {
-    console.log('Contacter encadreur:', stage.encadreur);
+    console.log('Contacter encadreur:', stage.encadreurNom);
     // Logique de contact
   };
 
@@ -191,12 +294,24 @@ export default function StagiaireStage() {
 
   const stats = {
     total: stages.length,
-    enCours: stages.filter(s => s.statut === 'En cours').length,
-    termines: stages.filter(s => s.statut === 'Terminé').length,
-    progressionMoyenne: Math.round(stages.reduce((acc, stage) => acc + stage.progression, 0) / stages.length),
+    enCours: stages.filter(s => s.statutStage === 'EN_COURS').length,
+    termines: stages.filter(s => s.statutStage === 'TERMINE').length,
+    enAttente: stages.filter(s => s.statutStage === 'EN_ATTENTE_VALIDATION').length,
+    progressionMoyenne: stages.length > 0 ? Math.round(stages.reduce((acc, stage) => acc + stage.progression, 0) / stages.length) : 0,
     tachesTerminees: stages.reduce((acc, stage) => acc + stage.tachesTerminees, 0),
-    objectifsAtteints: stages.reduce((acc, stage) => acc + stage.objectifsAtteints, 0)
+    tachesTotal: stages.reduce((acc, stage) => acc + stage.tachesTotal, 0)
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement de vos stages...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -206,6 +321,21 @@ export default function StagiaireStage() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -244,7 +374,7 @@ export default function StagiaireStage() {
               </motion.div>
             ),
             count: stats.total,
-            text: "Stages réalisés",
+            text: "Stages assignés",
             gradient: "from-emerald-500 to-emerald-600"
           },
           {
@@ -262,7 +392,7 @@ export default function StagiaireStage() {
             gradient: "from-blue-500 to-blue-600"
           },
           {
-            title: "Tâches Terminées",
+            title: "Tâches Accomplies",
             icon: (
               <motion.div
                 animate={{ y: [0, -8, 0] }}
@@ -272,7 +402,7 @@ export default function StagiaireStage() {
               </motion.div>
             ),
             count: stats.tachesTerminees,
-            text: "Tâches accomplies",
+            text: `sur ${stats.tachesTotal} tâches`,
             gradient: "from-purple-500 to-purple-600"
           },
           {
@@ -340,9 +470,11 @@ export default function StagiaireStage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="tous">Tous les statuts</SelectItem>
-                    <SelectItem value="En cours">En cours</SelectItem>
-                    <SelectItem value="Terminé">Terminés</SelectItem>
-                    <SelectItem value="En attente">En attente</SelectItem>
+                    <SelectItem value="EN_COURS">En cours</SelectItem>
+                    <SelectItem value="TERMINE">Terminés</SelectItem>
+                    <SelectItem value="EN_ATTENTE_VALIDATION">En attente</SelectItem>
+                    <SelectItem value="VALIDE">Validés</SelectItem>
+                    <SelectItem value="REFUSE">Refusés</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -365,7 +497,7 @@ export default function StagiaireStage() {
         <AnimatePresence>
           {stagesFiltres.map((stage) => (
             <motion.div
-              key={stage.id}
+              key={stage.documentId}
               variants={cardVariants}
               layout
               initial={{ opacity: 0, scale: 0.9 }}
@@ -379,8 +511,8 @@ export default function StagiaireStage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-2">
-                        <Badge className={`text-xs ${getStatutColor(stage.statut)}`}>
-                          {stage.statut}
+                        <Badge className={`text-xs ${getStatutColor(stage.statutStage)}`}>
+                          {getStatutLabel(stage.statutStage)}
                         </Badge>
                         <Badge variant="outline" className={`text-xs ${getTypeColor(stage.type)}`}>
                           {stage.type}
@@ -411,14 +543,16 @@ export default function StagiaireStage() {
                     </div>
 
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>{stage.ville}</span>
+                      <UserCheck className="h-4 w-4" />
+                      <span>Encadré par {stage.encadreurNom}</span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <UserCheck className="h-4 w-4" />
-                      <span>Encadré par {stage.encadreur}</span>
-                    </div>
+                    {stage.joursRestants > 0 && stage.statutStage === 'EN_COURS' && (
+                      <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                        <Clock className="h-4 w-4" />
+                        <span>{stage.joursRestants} jours restants</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Progression globale */}
@@ -438,18 +572,18 @@ export default function StagiaireStage() {
                   <div className="grid grid-cols-3 gap-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg mb-4">
                     <div className="text-center">
                       <div className="text-lg font-bold text-gray-900 dark:text-white">
-                        {stage.tachesTerminees}
+                        {stage.tachesTotal}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Tâches
+                        Tâches total
                       </div>
                     </div>
                     <div className="text-center">
                       <div className="text-lg font-bold text-gray-900 dark:text-white">
-                        {stage.objectifsAtteints}/{stage.totalObjectifs}
+                        {stage.tachesTerminees}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        Objectifs
+                        Terminées
                       </div>
                     </div>
                     <div className="text-center">
@@ -474,28 +608,11 @@ export default function StagiaireStage() {
                     </div>
                   </div>
 
-                  {/* Rapports */}
-                  {(stage.dernierRapport || stage.prochainRapport) && (
-                    <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                      <div className="text-xs text-amber-700 dark:text-amber-300 mb-1">Rapports</div>
-                      {stage.dernierRapport && (
-                        <div className="text-sm text-amber-600 dark:text-amber-400">
-                          Dernier: {new Date(stage.dernierRapport).toLocaleDateString()}
-                        </div>
-                      )}
-                      {stage.prochainRapport && (
-                        <div className="text-sm font-medium text-amber-700 dark:text-amber-300">
-                          Prochain: {new Date(stage.prochainRapport).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
                   {/* Description */}
                   <div className="mb-4">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Description</div>
                     <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
-                      {stage.description}
+                      {stage.description || "Aucune description disponible."}
                     </p>
                   </div>
 
@@ -511,7 +628,7 @@ export default function StagiaireStage() {
                       Détails
                     </Button>
                     
-                    {stage.statut === 'En cours' && (
+                    {stage.statutStage === 'EN_COURS' && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -541,7 +658,7 @@ export default function StagiaireStage() {
       </motion.div>
 
       {/* Message si aucun résultat */}
-      {stagesFiltres.length === 0 && (
+      {stagesFiltres.length === 0 && !loading && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -550,10 +667,13 @@ export default function StagiaireStage() {
         >
           <GraduationCap className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">
-            Aucun stage trouvé
+            {stages.length === 0 ? "Aucun stage assigné" : "Aucun stage trouvé"}
           </h3>
           <p className="text-gray-400 dark:text-gray-500">
-            Aucun stage ne correspond à vos critères de recherche.
+            {stages.length === 0 
+              ? "Vous n'avez pas encore de stages assignés." 
+              : "Aucun stage ne correspond à vos critères de recherche."
+            }
           </p>
         </motion.div>
       )}

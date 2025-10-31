@@ -40,9 +40,14 @@ export default function EncadreurSidebar({
     email: "",
     photoUrl: null
   });
+  const [notificationCount, setNotificationCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
+
+  // Configuration API
+  const API_BASE_URL = "http://localhost:9090/api";
 
   useEffect(() => {
     const root = document.documentElement;
@@ -55,49 +60,127 @@ export default function EncadreurSidebar({
     }
   }, [darkMode]);
 
-  useEffect(() => {
-    const fetchEncadreurData = async () => {
-      try {
-        const user = JSON.parse(localStorage.getItem("user"));
+  // Fonction pour récupérer le compte utilisateur
+  const getCurrentUserAndAccount = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (!user || !user.entityDocumentId) {
+        return null;
+      }
+
+      // Récupérer le compte utilisateur associé à l'encadreur
+      const compteResponse = await axios.get(
+        `${API_BASE_URL}/comptes-utilisateurs/entity/${user.entityDocumentId}/type/ENCADREUR`
+      );
+      
+      return compteResponse.data;
+    } catch (error) {
+      console.error("Erreur récupération compte encadreur:", error);
+      return null;
+    }
+  };
+
+  // Charger le nombre de notifications non lues
+  const loadNotificationCount = async () => {
+    try {
+      setNotificationsLoading(true);
+      const compteUtilisateur = await getCurrentUserAndAccount();
+      if (!compteUtilisateur) {
+        setNotificationCount(0);
+        return;
+      }
+
+      const response = await axios.get(
+        `${API_BASE_URL}/notifications/compte/${compteUtilisateur.documentId}/count-non-lues`
+      );
+      
+      setNotificationCount(response.data || 0);
+    } catch (error) {
+      console.error("Erreur chargement compteur notifications encadreur:", error);
+      setNotificationCount(0);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  };
+
+  // Charger les données de l'encadreur
+  const fetchEncadreurData = async () => {
+    try {
+      setLoading(true);
+      const user = JSON.parse(localStorage.getItem("user"));
+      
+      if (user && user.entityDocumentId) {
+        // Récupérer les données complètes de l'encadreur via l'API
+        const response = await axios.get(`http://localhost:9090/api/encadreurs/${user.entityDocumentId}`);
+        const encadreurData = response.data;
         
-        if (user && user.entityDocumentId) {
-          // Récupérer les données complètes de l'encadreur via l'API
-          const response = await axios.get(`http://localhost:9090/api/encadreurs/${user.entityDocumentId}`);
-          const encadreurData = response.data;
-          
-          setEncadreurInfo({
-            nom: encadreurData.nom || "Encadreur",
-            prenom: encadreurData.prenom || "",
-            email: encadreurData.email || "",
-            photoUrl: encadreurData.photoUrl || null
-          });
-        } else {
-          // Fallback si pas d'entityDocumentId
-          const userData = JSON.parse(localStorage.getItem("user") || "{}");
-          setEncadreurInfo({
-            nom: "Encadreur",
-            prenom: "",
-            email: userData.email || "",
-            photoUrl: null
-          });
-        }
-      } catch (error) {
-        console.error("Erreur lors de la récupération des données encadreur:", error);
-        // Fallback avec les données du localStorage
-        const user = JSON.parse(localStorage.getItem("user") || "{}");
+        setEncadreurInfo({
+          nom: encadreurData.nom || "Encadreur",
+          prenom: encadreurData.prenom || "",
+          email: encadreurData.email || "",
+          photoUrl: encadreurData.photoUrl || null
+        });
+      } else {
+        // Fallback si pas d'entityDocumentId
+        const userData = JSON.parse(localStorage.getItem("user") || "{}");
         setEncadreurInfo({
           nom: "Encadreur",
           prenom: "",
-          email: user.email || "",
+          email: userData.email || "",
           photoUrl: null
         });
-      } finally {
-        setLoading(false);
       }
+    } catch (error) {
+      console.error("Erreur lors de la récupération des données encadreur:", error);
+      // Fallback avec les données du localStorage
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      setEncadreurInfo({
+        nom: "Encadreur",
+        prenom: "",
+        email: user.email || "",
+        photoUrl: null
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Charger les données au montage
+  useEffect(() => {
+    fetchEncadreurData();
+    loadNotificationCount();
+  }, []);
+
+  // Mettre à jour le compteur quand la page redevient active
+  useEffect(() => {
+    const handleFocus = () => {
+      loadNotificationCount();
     };
 
-    fetchEncadreurData();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
+
+  // Polling pour les notifications (toutes les 30 secondes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadNotificationCount();
+    }, 30000); // 30 secondes
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Recharger les notifications quand on navigue vers la page des notifications
+  useEffect(() => {
+    if (location.pathname === "/encadreur/notifications") {
+      // Recharger le compteur après un délai pour laisser le temps à la page de traiter les notifications
+      setTimeout(() => {
+        loadNotificationCount();
+      }, 1000);
+    }
+  }, [location.pathname]);
 
   // Fonction pour générer les initiales
   const getInitials = (prenom, nom) => {
@@ -132,6 +215,30 @@ export default function EncadreurSidebar({
     navigate("/login");
   };
 
+  // Composant Badge de notification animé
+  const NotificationBadge = ({ count, loading }) => {
+    if (loading) {
+      return (
+        <span className="absolute -top-2 -right-2 bg-gray-400 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+          <div className="h-2 w-2 bg-white rounded-full animate-pulse"></div>
+        </span>
+      );
+    }
+
+    if (count <= 0) return null;
+    
+    return (
+      <motion.span 
+        className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center shadow-lg"
+        initial={{ scale: 0 }}
+        animate={{ scale: 1 }}
+        transition={{ type: "spring", stiffness: 500, damping: 15 }}
+      >
+        {count > 9 ? "9+" : count}
+      </motion.span>
+    );
+  };
+
   const menuItems = [
     {
       label: "Tableau de Bord",
@@ -158,9 +265,7 @@ export default function EncadreurSidebar({
       icon: (
         <div className="relative">
           <Bell className="w-5 h-5" />
-          <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-            3
-          </span>
+          <NotificationBadge count={notificationCount} loading={notificationsLoading} />
         </div>
       ), 
       path: "/encadreur/notifications" 
@@ -234,6 +339,15 @@ export default function EncadreurSidebar({
                     {encadreurInfo.email}
                   </span>
                 )}
+                {/* Badge de notification dans le header */}
+                {!collapsed && notificationCount > 0 && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                    <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                      {notificationCount} notification{notificationCount > 1 ? 's' : ''} non lue{notificationCount > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -253,7 +367,15 @@ export default function EncadreurSidebar({
             <Link
               key={item.label}
               to={item.path}
-              onClick={() => setMobileOpen(false)}
+              onClick={() => {
+                setMobileOpen(false);
+                // Recharger les notifications quand on clique sur le menu notifications
+                if (item.path === "/encadreur/notifications") {
+                  setTimeout(() => {
+                    loadNotificationCount();
+                  }, 500);
+                }
+              }}
               className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
                 location.pathname.startsWith(item.path)
                   ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg"
@@ -266,6 +388,12 @@ export default function EncadreurSidebar({
               {!collapsed && (
                 <span className="text-sm font-medium flex items-center justify-between w-full">
                   {item.label}
+                  {/* Badge supplémentaire dans le texte pour les notifications */}
+                  {item.path === "/encadreur/notifications" && notificationCount > 0 && (
+                    <span className="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-6 text-center">
+                      {notificationCount > 9 ? "9+" : notificationCount}
+                    </span>
+                  )}
                 </span>
               )}
             </Link>

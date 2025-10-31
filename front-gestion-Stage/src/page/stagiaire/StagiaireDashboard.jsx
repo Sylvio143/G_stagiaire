@@ -23,6 +23,8 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -46,133 +48,315 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration
-const dashboardData = {
-  stage: {
-    entreprise: "TechCorp Solutions",
-    poste: "Développeur Fullstack",
-    dateDebut: "2024-09-01",
-    dateFin: "2025-02-28",
-    progression: 75,
-    encadreur: "Thomas Leroy",
-    statut: "En cours",
-    dureeRestante: "2 mois 15 jours"
-  },
-  taches: [
-    {
-      id: 1,
-      titre: "Développement module authentification",
-      description: "Création du système de connexion avec JWT",
-      dateEcheance: "2024-12-20",
-      priorite: "haute",
-      statut: "en_cours",
-      progression: 80
-    },
-    {
-      id: 2,
-      titre: "Documentation API",
-      description: "Rédaction de la documentation Swagger",
-      dateEcheance: "2024-12-25",
-      priorite: "moyenne",
-      statut: "a_faire",
-      progression: 0
-    },
-    {
-      id: 3,
-      titre: "Tests unitaires",
-      description: "Implémentation des tests Jest",
-      dateEcheance: "2024-12-18",
-      priorite: "haute",
-      statut: "termine",
-      progression: 100
-    }
-  ],
-  competences: [
-    { nom: "React", niveau: 85 },
-    { nom: "Node.js", niveau: 78 },
-    { nom: "MongoDB", niveau: 70 },
-    { nom: "TypeScript", niveau: 65 }
-  ],
-  recentActivity: [
-    {
-      id: 1,
-      type: "tache_terminee",
-      message: "Vous avez terminé la tâche 'Tests unitaires'",
-      time: "Il y a 2 heures",
-      icon: <CheckCircle className="h-4 w-4 text-emerald-500" />
-    },
-    {
-      id: 2,
-      type: "feedback",
-      message: "Thomas Leroy a commenté votre rapport hebdomadaire",
-      time: "Il y a 5 heures",
-      icon: <UserCheck className="h-4 w-4 text-blue-500" />
-    },
-    {
-      id: 3,
-      type: "rappel",
-      message: "Rapport d'activité à soumettre dans 3 jours",
-      time: "Il y a 1 jour",
-      icon: <Bell className="h-4 w-4 text-amber-500" />
-    }
-  ],
-  stats: {
-    tachesTerminees: 12,
-    tachesEnCours: 3,
-    tachesRetard: 1,
-    heuresTravail: 245,
-    objectifsAtteints: 8,
-    totalObjectifs: 10
-  }
-};
-
 export default function StagiaireDashboard() {
   const [selectedPeriod, setSelectedPeriod] = useState("semaine");
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState({
+    stage: null,
+    taches: [],
+    competences: [],
+    recentActivity: [],
+    stats: {
+      tachesTerminees: 0,
+      tachesEnCours: 0,
+      tachesRetard: 0,
+      heuresTravail: 0,
+      objectifsAtteints: 0,
+      totalObjectifs: 0
+    }
+  });
+
+  // Configuration API
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les données du dashboard
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer l'ID du stagiaire connecté
+      const user = JSON.parse(localStorage.getItem("user"));
+      const stagiaireId = user?.entityDocumentId;
+      
+      if (!stagiaireId) {
+        toast.error("Impossible de récupérer les informations du stagiaire");
+        return;
+      }
+
+      // Récupérer les stages du stagiaire
+      const stagesResponse = await axios.get(`${API_BASE_URL}/stages/stagiaire/${stagiaireId}`);
+      const stagesStagiaire = stagesResponse.data;
+
+      // Trouver le stage en cours
+      const stageEnCours = stagesStagiaire.find(stage => stage.statutStage === 'EN_COURS');
+      
+      if (!stageEnCours) {
+        setDashboardData(prev => ({
+          ...prev,
+          stage: null
+        }));
+        return;
+      }
+
+      // Récupérer les détails complets du stage
+      const stageDetailResponse = await axios.get(`${API_BASE_URL}/stages/${stageEnCours.documentId}`);
+      const stageDetail = stageDetailResponse.data;
+
+      // Récupérer les informations de l'encadreur
+      let encadreurNom = "Non assigné";
+      if (stageDetail.encadreurDocumentId) {
+        try {
+          const encadreurResponse = await axios.get(`${API_BASE_URL}/encadreurs/${stageDetail.encadreurDocumentId}`);
+          const encadreur = encadreurResponse.data;
+          encadreurNom = `${encadreur.prenom} ${encadreur.nom}`;
+        } catch (error) {
+          console.error("Erreur récupération encadreur:", error);
+        }
+      }
+
+      // Récupérer les informations du supérieur hiérarchique (entreprise)
+      let entreprise = "Entreprise non spécifiée";
+      if (stageDetail.superieurHierarchiqueDocumentId) {
+        try {
+          const superieurResponse = await axios.get(`${API_BASE_URL}/superieurs-hierarchiques/${stageDetail.superieurHierarchiqueDocumentId}`);
+          const superieur = superieurResponse.data;
+          entreprise = superieur.departement || "Entreprise non spécifiée";
+        } catch (error) {
+          console.error("Erreur récupération supérieur:", error);
+        }
+      }
+
+      // Calculer la progression du stage
+      const maintenant = new Date();
+      const dateDebut = new Date(stageDetail.dateDebut);
+      const dateFin = new Date(stageDetail.dateFin);
+      const dureeTotale = dateFin - dateDebut;
+      const tempsEcoule = maintenant - dateDebut;
+      const progressionStage = Math.min(100, Math.max(0, (tempsEcoule / dureeTotale) * 100));
+
+      // Calculer la durée restante
+      const joursRestants = Math.ceil((dateFin - maintenant) / (1000 * 60 * 60 * 24));
+      const moisRestants = Math.floor(joursRestants / 30);
+      const joursDansMois = joursRestants % 30;
+      const dureeRestante = moisRestants > 0 
+        ? `${moisRestants} mois ${joursDansMois > 0 ? `${joursDansMois} jours` : ''}`
+        : `${joursRestants} jours`;
+
+      // Récupérer les tâches du stage
+      const tachesResponse = await axios.get(`${API_BASE_URL}/taches/stage/${stageEnCours.documentId}`);
+      const tachesData = tachesResponse.data;
+
+      // Calculer les statistiques des tâches
+      const tachesTerminees = tachesData.filter(t => t.statut === 'TERMINEE').length;
+      const tachesEnCours = tachesData.filter(t => t.statut === 'EN_COURS').length;
+      const tachesAFaire = tachesData.filter(t => t.statut === 'A_FAIRE').length;
+      const tachesRetard = tachesData.filter(t => {
+        if (!t.dateFin || t.statut === 'TERMINEE') return false;
+        return new Date(t.dateFin) < new Date();
+      }).length;
+
+      // Récupérer les notifications récentes
+      let recentActivity = [];
+      try {
+        const compteResponse = await axios.get(
+          `${API_BASE_URL}/comptes-utilisateurs/entity/${stagiaireId}/type/STAGIAIRE`
+        );
+        if (compteResponse.data) {
+          const compteStagiaire = compteResponse.data;
+          const notificationsResponse = await axios.get(
+            `${API_BASE_URL}/notifications/compte/${compteStagiaire.documentId}`
+          );
+          recentActivity = notificationsResponse.data.slice(0, 3).map(notif => ({
+            id: notif.documentId,
+            type: "notification",
+            message: notif.message,
+            time: formatTimeAgo(notif.createdAt),
+            icon: <Bell className="h-4 w-4 text-blue-500" />
+          }));
+        }
+      } catch (error) {
+        console.error("Erreur récupération notifications:", error);
+        // Notifications par défaut si erreur
+        recentActivity = [
+          {
+            id: 1,
+            type: "welcome",
+            message: "Bienvenue sur votre tableau de bord de stage",
+            time: "Maintenant",
+            icon: <Bell className="h-4 w-4 text-emerald-500" />
+          }
+        ];
+      }
+
+      // Compétences basées sur les tâches
+      const competences = genererCompetences(tachesData);
+
+      setDashboardData({
+        stage: {
+          ...stageDetail,
+          encadreurNom,
+          entreprise,
+          progression: Math.round(progressionStage),
+          dureeRestante,
+          poste: "Stagiaire" // Vous pourriez adapter selon vos besoins
+        },
+        taches: tachesData.slice(0, 3), // Afficher seulement 3 tâches
+        competences,
+        recentActivity,
+        stats: {
+          tachesTerminees,
+          tachesEnCours,
+          tachesRetard,
+          heuresTravail: Math.round(tachesTerminees * 8), // Estimation basée sur les tâches
+          objectifsAtteints: tachesTerminees,
+          totalObjectifs: tachesData.length
+        }
+      });
+
+    } catch (error) {
+      console.error("Erreur lors du chargement du dashboard:", error);
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fonction pour formater le temps écoulé
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "À l'instant";
+    if (diffMins < 60) return `Il y a ${diffMins} min`;
+    if (diffHours < 24) return `Il y a ${diffHours} h`;
+    if (diffDays === 1) return "Hier";
+    return `Il y a ${diffDays} jours`;
+  };
+
+  // Générer les compétences basées sur les tâches
+  const genererCompetences = (taches) => {
+    const competencesMap = {};
+    
+    taches.forEach(tache => {
+      // Analyser la description pour détecter des technologies
+      const description = tache.description?.toLowerCase() || '';
+      
+      if (description.includes('react') || description.includes('frontend')) {
+        competencesMap['React'] = Math.min(100, (competencesMap['React'] || 0) + 20);
+      }
+      if (description.includes('node') || description.includes('backend')) {
+        competencesMap['Node.js'] = Math.min(100, (competencesMap['Node.js'] || 0) + 20);
+      }
+      if (description.includes('mongodb') || description.includes('database')) {
+        competencesMap['MongoDB'] = Math.min(100, (competencesMap['MongoDB'] || 0) + 15);
+      }
+      if (description.includes('typescript')) {
+        competencesMap['TypeScript'] = Math.min(100, (competencesMap['TypeScript'] || 0) + 25);
+      }
+      if (description.includes('javascript')) {
+        competencesMap['JavaScript'] = Math.min(100, (competencesMap['JavaScript'] || 0) + 20);
+      }
+      if (description.includes('api') || description.includes('rest')) {
+        competencesMap['API Design'] = Math.min(100, (competencesMap['API Design'] || 0) + 15);
+      }
+      if (description.includes('test') || description.includes('jest')) {
+        competencesMap['Testing'] = Math.min(100, (competencesMap['Testing'] || 0) + 10);
+      }
+    });
+
+    // Compétences par défaut si aucune détectée
+    if (Object.keys(competencesMap).length === 0) {
+      return [
+        { nom: "Développement", niveau: 60 },
+        { nom: "Collaboration", niveau: 75 },
+        { nom: "Analyse", niveau: 55 },
+        { nom: "Résolution de problèmes", niveau: 70 }
+      ];
+    }
+
+    return Object.entries(competencesMap).map(([nom, niveau]) => ({
+      nom,
+      niveau: Math.max(40, Math.min(95, niveau)) // Niveau entre 40% et 95%
+    })).slice(0, 4); // Maximum 4 compétences
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
   const getPrioriteColor = (priorite) => {
     switch (priorite) {
-      case 'haute': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
-      case 'moyenne': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
-      case 'basse': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
+      case 1: return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
+      case 2: return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
+      case 3: return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+    }
+  };
+
+  const getPrioriteLabel = (priorite) => {
+    switch (priorite) {
+      case 1: return 'Haute';
+      case 2: return 'Moyenne';
+      case 3: return 'Basse';
+      default: return 'Non définie';
     }
   };
 
   const getStatutColor = (statut) => {
     switch (statut) {
-      case 'termine': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300';
-      case 'en_cours': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300';
-      case 'a_faire': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+      case 'TERMINEE': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300';
+      case 'EN_COURS': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300';
+      case 'A_FAIRE': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    }
+  };
+
+  const getStatutLabel = (statut) => {
+    switch (statut) {
+      case 'TERMINEE': return 'Terminée';
+      case 'EN_COURS': return 'En cours';
+      case 'A_FAIRE': return 'À faire';
+      default: return statut;
     }
   };
 
   const getStatutIcon = (statut) => {
     switch (statut) {
-      case 'termine': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
-      case 'en_cours': return <PlayCircle className="h-4 w-4 text-blue-500" />;
-      case 'a_faire': return <Clock className="h-4 w-4 text-gray-500" />;
+      case 'TERMINEE': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
+      case 'EN_COURS': return <PlayCircle className="h-4 w-4 text-blue-500" />;
+      case 'A_FAIRE': return <Clock className="h-4 w-4 text-gray-500" />;
       default: return <Clock className="h-4 w-4 text-gray-500" />;
     }
   };
 
-  const handleStartTask = (tacheId) => {
-    console.log('Démarrer tâche:', tacheId);
-    // Logique pour démarrer une tâche
+  const handleCommencerTache = async (tache) => {
+    try {
+      await axios.put(`${API_BASE_URL}/taches/${tache.documentId}/statut/EN_COURS`);
+      toast.success("Tâche mise en cours");
+      await fetchDashboardData(); // Recharger les données
+    } catch (error) {
+      console.error("Erreur mise en cours tâche:", error);
+      toast.error("Erreur lors de la mise à jour");
+    }
   };
 
-  const handleCompleteTask = (tacheId) => {
-    console.log('Terminer tâche:', tacheId);
-    // Logique pour terminer une tâche
-  };
-
-  const handleViewDetails = (tacheId) => {
-    console.log('Voir détails tâche:', tacheId);
-    // Navigation vers les détails de la tâche
+  const handleTerminerTache = async (tache) => {
+    try {
+      await axios.put(`${API_BASE_URL}/taches/${tache.documentId}/statut/TERMINEE`);
+      toast.success("Tâche terminée avec succès");
+      await fetchDashboardData(); // Recharger les données
+    } catch (error) {
+      console.error("Erreur terminaison tâche:", error);
+      toast.error("Erreur lors de la mise à jour");
+    }
   };
 
   const calculateDaysRemaining = (dateEcheance) => {
+    if (!dateEcheance) return null;
     const today = new Date();
     const echeance = new Date(dateEcheance);
     const diffTime = echeance - today;
@@ -194,6 +378,33 @@ export default function StagiaireDashboard() {
     );
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement de votre tableau de bord...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboardData.stage) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <Briefcase className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">
+            Aucun stage en cours
+          </h3>
+          <p className="text-gray-400 dark:text-gray-500">
+            Vous n'avez pas de stage en cours actuellement.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 80 }}
@@ -202,6 +413,21 @@ export default function StagiaireDashboard() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -361,7 +587,7 @@ export default function StagiaireDashboard() {
                 <div>
                   <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Encadreur</p>
                   <p className="text-sm text-gray-900 dark:text-white">
-                    {dashboardData.stage.encadreur}
+                    {dashboardData.stage.encadreurNom}
                   </p>
                 </div>
               </div>
@@ -399,25 +625,25 @@ export default function StagiaireDashboard() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <ClipboardList className="h-5 w-5 text-blue-600" />
-                  Tâches en Cours
+                  Tâches Récentes
                 </CardTitle>
                 <CardDescription>
-                  {dashboardData.taches.filter(t => t.statut === 'en_cours' || t.statut === 'a_faire').length} tâches à réaliser
+                  {dashboardData.taches.filter(t => t.statut === 'EN_COURS' || t.statut === 'A_FAIRE').length} tâches à réaliser
                 </CardDescription>
               </div>
               <Badge variant="outline" className="bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
-                {dashboardData.taches.filter(t => t.statut === 'en_cours').length} en cours
+                {dashboardData.taches.filter(t => t.statut === 'EN_COURS').length} en cours
               </Badge>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {dashboardData.taches
-                  .filter(tache => tache.statut !== 'termine')
-                  .slice(0, 3)
-                  .map((tache) => {
-                    const joursRestants = calculateDaysRemaining(tache.dateEcheance);
+                {dashboardData.taches.length > 0 ? (
+                  dashboardData.taches.map((tache) => {
+                    const joursRestants = calculateDaysRemaining(tache.dateFin);
+                    const estEnRetard = tache.dateFin && new Date(tache.dateFin) < new Date() && tache.statut !== 'TERMINEE';
+                    
                     return (
-                      <div key={tache.id} className="flex items-start justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div key={tache.documentId} className="flex items-start justify-between p-3 rounded-lg border border-gray-200 dark:border-gray-700">
                         <div className="flex items-start gap-3 flex-1">
                           <div className="mt-1">
                             {getStatutIcon(tache.statut)}
@@ -428,59 +654,65 @@ export default function StagiaireDashboard() {
                                 {tache.titre}
                               </p>
                               <Badge className={getPrioriteColor(tache.priorite)}>
-                                {tache.priorite}
+                                {getPrioriteLabel(tache.priorite)}
                               </Badge>
                             </div>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mb-2 line-clamp-2">
                               {tache.description}
                             </p>
                             <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-                              <span>Échéance: {new Date(tache.dateEcheance).toLocaleDateString()}</span>
-                              {joursRestants <= 3 && joursRestants > 0 && (
+                              {tache.dateFin && (
+                                <span>Échéance: {new Date(tache.dateFin).toLocaleDateString()}</span>
+                              )}
+                              {estEnRetard && (
+                                <Badge variant="outline" className="text-red-600 border-red-300">
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  En retard
+                                </Badge>
+                              )}
+                              {joursRestants !== null && joursRestants <= 3 && joursRestants > 0 && !estEnRetard && (
                                 <Badge variant="outline" className="text-amber-600 border-amber-300">
                                   {joursRestants} jour(s)
                                 </Badge>
                               )}
-                              {joursRestants < 0 && (
-                                <Badge variant="outline" className="text-red-600 border-red-300">
-                                  En retard
-                                </Badge>
-                              )}
                             </div>
-                            {tache.statut === 'en_cours' && (
-                              <div className="mt-2">
-                                <div className="flex justify-between text-xs mb-1">
-                                  <span>Progression</span>
-                                  <span>{tache.progression}%</span>
-                                </div>
-                                <CustomProgressBar value={tache.progression} />
-                              </div>
-                            )}
                           </div>
                         </div>
                         <div className="flex gap-1 ml-2">
-                          {tache.statut === 'a_faire' && (
+                          {tache.statut === 'A_FAIRE' && (
                             <Button
                               size="sm"
-                              onClick={() => handleStartTask(tache.id)}
+                              onClick={() => handleCommencerTache(tache)}
                               className="h-8 px-2 bg-emerald-600 hover:bg-emerald-700"
                             >
                               <PlayCircle className="h-3 w-3" />
                             </Button>
                           )}
-                          {tache.statut === 'en_cours' && (
+                          {tache.statut === 'EN_COURS' && (
                             <Button
                               size="sm"
-                              onClick={() => handleCompleteTask(tache.id)}
+                              onClick={() => handleTerminerTache(tache)}
                               className="h-8 px-2 bg-blue-600 hover:bg-blue-700"
                             >
                               <CheckCircle className="h-3 w-3" />
                             </Button>
                           )}
+                          {tache.statut === 'TERMINEE' && (
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Terminée
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     );
-                  })}
+                  })
+                ) : (
+                  <div className="text-center py-4">
+                    <ClipboardList className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Aucune tâche assignée</p>
+                  </div>
+                )}
               </div>
               <Button variant="outline" className="w-full mt-4">
                 Voir toutes les tâches
@@ -545,19 +777,26 @@ export default function StagiaireDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {dashboardData.recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                    <div className="mt-0.5">
-                      {activity.icon}
+                {dashboardData.recentActivity.length > 0 ? (
+                  dashboardData.recentActivity.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                      <div className="mt-0.5">
+                        {activity.icon}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-900 dark:text-white mb-1">
+                          {activity.message}
+                        </p>
+                        <span className="text-xs text-gray-500">{activity.time}</span>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-900 dark:text-white mb-1">
-                        {activity.message}
-                      </p>
-                      <span className="text-xs text-gray-500">{activity.time}</span>
-                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-4">
+                    <Bell className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Aucune activité récente</p>
                   </div>
-                ))}
+                )}
               </div>
               <Button variant="outline" className="w-full mt-4">
                 Voir toutes les notifications

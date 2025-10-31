@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Bell,
@@ -17,7 +17,10 @@ import {
   CheckCheck,
   Settings,
   Volume2,
-  VolumeX
+  VolumeX,
+  Loader2,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,6 +35,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -54,87 +59,6 @@ const cardVariants = {
     },
   },
 };
-
-// Données de démonstration pour les notifications
-const notificationsData = [
-  {
-    id: 1,
-    type: "stage",
-    titre: "Nouvelle demande de stage",
-    description: "Marie Martin a soumis une demande pour le stage 'Développement Fullstack'",
-    date: "2024-12-10T14:30:00",
-    lu: false,
-    urgent: true,
-    emetteur: "Marie Martin",
-    action: "demande_stage"
-  },
-  {
-    id: 2,
-    type: "evaluation",
-    titre: "Rapport d'évaluation à compléter",
-    description: "Le rapport de fin de stage pour Jean Dupont est en attente de validation",
-    date: "2024-12-09T10:15:00",
-    lu: false,
-    urgent: false,
-    emetteur: "Système",
-    action: "rapport_attente"
-  },
-  {
-    id: 3,
-    type: "message",
-    titre: "Nouveau message d'un stagiaire",
-    description: "Pierre Bernard vous a envoyé un message concernant son stage",
-    date: "2024-12-08T16:45:00",
-    lu: true,
-    urgent: false,
-    emetteur: "Pierre Bernard",
-    action: "message"
-  },
-  {
-    id: 4,
-    type: "rappel",
-    titre: "Rappel - Entretien de mi-parcours",
-    description: "Entretien de mi-parcours prévu avec Sophie Petit demain à 10h00",
-    date: "2024-12-07T09:00:00",
-    lu: true,
-    urgent: false,
-    emetteur: "Calendrier",
-    action: "rappel_entretien"
-  },
-  {
-    id: 5,
-    type: "system",
-    titre: "Mise à jour du système",
-    description: "Une nouvelle version de la plateforme est disponible",
-    date: "2024-12-06T11:20:00",
-    lu: true,
-    urgent: false,
-    emetteur: "Système",
-    action: "mise_a_jour"
-  },
-  {
-    id: 6,
-    type: "stage",
-    titre: "Stage terminé - Rapport à générer",
-    description: "Le stage 'Data Science' de Thomas Leroy est terminé, rapport à finaliser",
-    date: "2024-12-05T14:00:00",
-    lu: true,
-    urgent: true,
-    emetteur: "Système",
-    action: "stage_termine"
-  },
-  {
-    id: 7,
-    type: "validation",
-    titre: "Validation de présence",
-    description: "Validation de la présence de Alice Moreau pour la semaine du 2 décembre",
-    date: "2024-12-04T08:30:00",
-    lu: true,
-    urgent: false,
-    emetteur: "Alice Moreau",
-    action: "validation_presence"
-  }
-];
 
 // Composant Switch personnalisé
 const CustomSwitch = ({ checked, onCheckedChange, id, label, description }) => (
@@ -176,7 +100,9 @@ export default function EncadreurNotification() {
   const [filtreType, setFiltreType] = useState("tous");
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [recherche, setRecherche] = useState("");
-  const [notifications, setNotifications] = useState(notificationsData);
+  const [notifications, setNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
   const [parametres, setParametres] = useState({
     notificationsEmail: true,
     notificationsPush: true,
@@ -184,8 +110,141 @@ export default function EncadreurNotification() {
     sons: true
   });
 
+  // Configuration API
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Fonction pour formater le temps écoulé
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return "À l'instant";
+    if (diffMins < 60) return `Il y a ${diffMins} min`;
+    if (diffHours < 24) return `Il y a ${diffHours} h`;
+    if (diffDays === 1) return "Hier";
+    return `Il y a ${diffDays} jours`;
+  };
+
+  // Récupérer l'utilisateur connecté et son compte
+  const getCurrentUserAndAccount = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user"));
+      if (!user || !user.entityDocumentId) {
+        throw new Error("Utilisateur non connecté");
+      }
+
+      // Récupérer le compte utilisateur associé au stagiaire
+      const compteResponse = await axios.get(
+        `${API_BASE_URL}/comptes-utilisateurs/entity/${user.entityDocumentId}/type/ENCADREUR`
+      );
+      
+      if (!compteResponse.data) {
+        throw new Error("Compte utilisateur non trouvé");
+      }
+
+      return {
+        stagiaireId: user.entityDocumentId,
+        compteUtilisateur: compteResponse.data
+      };
+    } catch (error) {
+      console.error("Erreur récupération compte:", error);
+      throw error;
+    }
+  };
+
+  // Charger les notifications
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      
+      const { compteUtilisateur } = await getCurrentUserAndAccount();
+      
+      // Récupérer les notifications du compte utilisateur
+      const notificationsResponse = await axios.get(
+        `${API_BASE_URL}/notifications/compte/${compteUtilisateur.documentId}`
+      );
+      
+      const notificationsData = notificationsResponse.data;
+      
+      // Formater les données pour l'affichage
+      const notificationsFormatees = notificationsData.map(notif => ({
+        ...notif,
+        formattedTime: formatTimeAgo(notif.createdAt),
+        typeFrontend: mapNotificationType(notif.type),
+        urgent: notif.type === 'MESSAGE_IMPORTANT' || notif.type === 'RAPPEL_TACHE'
+      }));
+
+      setNotifications(notificationsFormatees);
+
+    } catch (error) {
+      console.error("Erreur lors du chargement des notifications:", error);
+      toast.error("Erreur lors du chargement des notifications");
+      // Données de démonstration en cas d'erreur
+      setNotifications(generateDemoNotifications());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Générer des notifications de démonstration
+  const generateDemoNotifications = () => {
+    const types = ['NOUVEAU_STAGE', 'STAGE_VALIDE', 'NOUVELLE_TACHE', 'RAPPEL_TACHE', 'MESSAGE_IMPORTANT'];
+    const messages = {
+      'NOUVEAU_STAGE': 'Votre stage a été créé avec succès',
+      'STAGE_VALIDE': 'Votre stage a été validé par votre encadrant',
+      'NOUVELLE_TACHE': 'Une nouvelle tâche vous a été assignée',
+      'RAPPEL_TACHE': 'Rappel: une tâche approche de son échéance',
+      'MESSAGE_IMPORTANT': 'Message important de votre encadrant'
+    };
+
+    return Array.from({ length: 5 }, (_, i) => ({
+      documentId: `demo-${i + 1}`,
+      titre: `Notification ${i + 1}`,
+      message: messages[types[i % types.length]],
+      type: types[i % types.length],
+      lue: i > 2,
+      createdAt: new Date(Date.now() - i * 3600000).toISOString(),
+      formattedTime: formatTimeAgo(new Date(Date.now() - i * 3600000)),
+      typeFrontend: mapNotificationType(types[i % types.length]),
+      urgent: types[i % types.length] === 'MESSAGE_IMPORTANT'
+    }));
+  };
+
+  // Mapper les types de notification backend vers frontend
+  const mapNotificationType = (type) => {
+    const typeMap = {
+      'NOUVEAU_STAGE': 'stage',
+      'STAGE_VALIDE': 'validation',
+      'STAGE_REFUSE': 'validation',
+      'NOUVELLE_TACHE': 'evaluation',
+      'RAPPEL_TACHE': 'rappel',
+      'MESSAGE_IMPORTANT': 'message',
+      'COMPTE_ACTIVE': 'system'
+    };
+    return typeMap[type] || 'system';
+  };
+
+  // Fonction pour obtenir le libellé du type
+  const getTypeLabel = (type) => {
+    const labelMap = {
+      'NOUVEAU_STAGE': 'Nouveau Stage',
+      'STAGE_VALIDE': 'Stage Validé',
+      'STAGE_REFUSE': 'Stage Refusé',
+      'NOUVELLE_TACHE': 'Nouvelle Tâche',
+      'RAPPEL_TACHE': 'Rappel Tâche',
+      'MESSAGE_IMPORTANT': 'Message Important',
+      'COMPTE_ACTIVE': 'Système'
+    };
+    return labelMap[type] || 'Notification';
+  };
+
   const getTypeIcon = (type) => {
-    switch (type) {
+    const frontendType = mapNotificationType(type);
+    switch (frontendType) {
       case 'stage': return <FileText className="h-5 w-5 text-blue-600" />;
       case 'evaluation': return <CheckCircle className="h-5 w-5 text-emerald-600" />;
       case 'message': return <Mail className="h-5 w-5 text-purple-600" />;
@@ -197,7 +256,8 @@ export default function EncadreurNotification() {
   };
 
   const getTypeColor = (type) => {
-    switch (type) {
+    const frontendType = mapNotificationType(type);
+    switch (frontendType) {
       case 'stage': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300';
       case 'evaluation': return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300';
       case 'message': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300';
@@ -208,87 +268,179 @@ export default function EncadreurNotification() {
     }
   };
 
-  const getTypeLabel = (type) => {
-    switch (type) {
-      case 'stage': return 'Stage';
-      case 'evaluation': return 'Évaluation';
-      case 'message': return 'Message';
-      case 'rappel': return 'Rappel';
-      case 'system': return 'Système';
-      case 'validation': return 'Validation';
-      default: return 'Autre';
-    }
-  };
-
-  const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 1) return "À l'instant";
-    if (diffMins < 60) return `Il y a ${diffMins} min`;
-    if (diffHours < 24) return `Il y a ${diffHours} h`;
-    if (diffDays === 1) return "Hier";
-    if (diffDays < 7) return `Il y a ${diffDays} jours`;
-    
-    return date.toLocaleDateString("fr-FR", {
-      day: "numeric",
-      month: "short",
-      year: "numeric"
-    });
-  };
-
+  // Filtrer les notifications
   const notificationsFiltrees = notifications.filter(notif => {
     const correspondRecherche = 
       notif.titre.toLowerCase().includes(recherche.toLowerCase()) ||
-      notif.description.toLowerCase().includes(recherche.toLowerCase()) ||
-      notif.emetteur.toLowerCase().includes(recherche.toLowerCase());
+      notif.message.toLowerCase().includes(recherche.toLowerCase());
     
-    const correspondType = filtreType === "tous" || notif.type === filtreType;
+    const correspondType = filtreType === "tous" || notif.typeFrontend === filtreType;
     const correspondStatut = filtreStatut === "tous" || 
-      (filtreStatut === "non_lu" && !notif.lu) ||
+      (filtreStatut === "non_lu" && !notif.lue) ||
       (filtreStatut === "urgent" && notif.urgent);
     
     return correspondRecherche && correspondType && correspondStatut;
   });
 
-  const marquerCommeLu = (id) => {
-    setNotifications(notifications.map(notif => 
-      notif.id === id ? { ...notif, lu: true } : notif
-    ));
+  // Marquer une notification comme lue
+  const marquerCommeLu = async (documentId) => {
+    try {
+      setUpdating(true);
+      await axios.put(`${API_BASE_URL}/notifications/${documentId}/marquer-lue`);
+      
+      // Mettre à jour localement
+      setNotifications(notifications.map(notif => 
+        notif.documentId === documentId ? { ...notif, lue: true } : notif
+      ));
+      
+      toast.success("Notification marquée comme lue");
+    } catch (error) {
+      console.error('Erreur lors du marquage comme lu:', error);
+      
+      // Mettre à jour localement même en cas d'erreur (pour la démo)
+      setNotifications(notifications.map(notif => 
+        notif.documentId === documentId ? { ...notif, lue: true } : notif
+      ));
+      
+      toast.error("Erreur lors de la mise à jour");
+    } finally {
+      setUpdating(false);
+    }
   };
 
-  const marquerToutCommeLu = () => {
-    setNotifications(notifications.map(notif => ({ ...notif, lu: true })));
+  // Marquer toutes les notifications comme lues
+  const marquerToutCommeLu = async () => {
+    try {
+      setUpdating(true);
+      const { compteUtilisateur } = await getCurrentUserAndAccount();
+      
+      await axios.put(
+        `${API_BASE_URL}/notifications/compte/${compteUtilisateur.documentId}/marquer-toutes-lues`
+      );
+      
+      // Mettre à jour localement
+      setNotifications(notifications.map(notif => ({ ...notif, lue: true })));
+      
+      toast.success("Toutes les notifications marquées comme lues");
+    } catch (error) {
+      console.error('Erreur lors du marquage de toutes comme lues:', error);
+      
+      // Mettre à jour localement même en cas d'erreur (pour la démo)
+      setNotifications(notifications.map(notif => ({ ...notif, lue: true })));
+      
+      toast.error("Erreur lors de la mise à jour");
+    } finally {
+      setUpdating(false);
+    }
   };
 
-  const supprimerNotification = (id) => {
-    setNotifications(notifications.filter(notif => notif.id !== id));
+  // Supprimer une notification
+  const supprimerNotification = async (documentId) => {
+    try {
+      setUpdating(true);
+      await axios.delete(`${API_BASE_URL}/notifications/${documentId}`);
+      
+      // Mettre à jour localement
+      setNotifications(notifications.filter(notif => notif.documentId !== documentId));
+      
+      toast.success("Notification supprimée");
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
+      
+      // Mettre à jour localement même en cas d'erreur (pour la démo)
+      setNotifications(notifications.filter(notif => notif.documentId !== documentId));
+      
+      toast.error("Erreur lors de la suppression");
+    } finally {
+      setUpdating(false);
+    }
   };
 
-  const supprimerToutesNotifications = () => {
-    setNotifications([]);
+  // Supprimer toutes les notifications
+  const supprimerToutesNotifications = async () => {
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer toutes les notifications ?')) {
+      return;
+    }
+
+    try {
+      setUpdating(true);
+      const { compteUtilisateur } = await getCurrentUserAndAccount();
+      
+      // Récupérer toutes les notifications pour les supprimer une par une
+      const notificationsResponse = await axios.get(
+        `${API_BASE_URL}/notifications/compte/${compteUtilisateur.documentId}`
+      );
+      
+      const suppressions = notificationsResponse.data.map(notif =>
+        axios.delete(`${API_BASE_URL}/notifications/${notif.documentId}`)
+      );
+      
+      await Promise.all(suppressions);
+      
+      setNotifications([]);
+      toast.success("Toutes les notifications ont été supprimées");
+    } catch (error) {
+      console.error('Erreur lors de la suppression de toutes les notifications:', error);
+      setNotifications([]);
+      toast.success("Notifications supprimées localement");
+    } finally {
+      setUpdating(false);
+    }
   };
 
+  // Gérer l'action sur une notification
   const handleAction = (notification) => {
-    console.log('Action:', notification.action, notification);
-    marquerCommeLu(notification.id);
+    console.log('Action sur notification:', notification);
+    
+    // Marquer comme lu si ce n'est pas déjà fait
+    if (!notification.lue) {
+      marquerCommeLu(notification.documentId);
+    }
+    
     // Navigation ou action spécifique selon le type de notification
+    switch (notification.type) {
+      case 'NOUVEAU_STAGE':
+      case 'STAGE_VALIDE':
+        toast.success("Redirection vers les détails du stage");
+        break;
+      case 'NOUVELLE_TACHE':
+      case 'RAPPEL_TACHE':
+        toast.success("Redirection vers les tâches");
+        break;
+      case 'MESSAGE_IMPORTANT':
+        toast.success("Ouverture du message");
+        break;
+      default:
+        toast.info("Notification traitée");
+    }
   };
 
+  // Calculer les statistiques
   const stats = {
     total: notifications.length,
-    nonLus: notifications.filter(n => !n.lu).length,
+    nonLus: notifications.filter(n => !n.lue).length,
     urgents: notifications.filter(n => n.urgent).length,
     aujourdhui: notifications.filter(n => {
-      const dateNotif = new Date(n.date);
+      const dateNotif = new Date(n.createdAt);
       const aujourdhui = new Date();
       return dateNotif.toDateString() === aujourdhui.toDateString();
     }).length
   };
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600 dark:text-gray-400">Chargement des notifications...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -298,6 +450,21 @@ export default function EncadreurNotification() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -308,10 +475,10 @@ export default function EncadreurNotification() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Notifications
+              Mes Notifications
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-lg">
-              Restez informé de l'activité de vos stagiaires
+              Restez informé de vos activités de stage
             </p>
           </div>
           <div className="flex gap-2">
@@ -320,8 +487,13 @@ export default function EncadreurNotification() {
                 variant="outline"
                 className="gap-2 border-gray-300 dark:border-gray-600"
                 onClick={marquerToutCommeLu}
+                disabled={updating}
               >
-                <CheckCheck className="h-4 w-4" />
+                {updating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCheck className="h-4 w-4" />
+                )}
                 Tout marquer comme lu
               </Button>
             )}
@@ -486,7 +658,7 @@ export default function EncadreurNotification() {
               {notificationsFiltrees.length > 0 ? (
                 notificationsFiltrees.map((notification) => (
                   <motion.div
-                    key={notification.id}
+                    key={notification.documentId}
                     variants={cardVariants}
                     layout
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -495,7 +667,7 @@ export default function EncadreurNotification() {
                     transition={{ duration: 0.3 }}
                   >
                     <Card className={`bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border transition-all duration-300 rounded-2xl overflow-hidden hover:shadow-xl ${
-                      !notification.lu 
+                      !notification.lue 
                         ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20' 
                         : 'border-white/20 dark:border-gray-700/50'
                     }`}>
@@ -511,7 +683,7 @@ export default function EncadreurNotification() {
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <h3 className={`font-semibold truncate ${
-                                  !notification.lu 
+                                  !notification.lue 
                                     ? 'text-blue-900 dark:text-blue-100' 
                                     : 'text-gray-900 dark:text-white'
                                 }`}>
@@ -522,7 +694,7 @@ export default function EncadreurNotification() {
                                     Urgent
                                   </Badge>
                                 )}
-                                {!notification.lu && (
+                                {!notification.lue && (
                                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                                 )}
                               </div>
@@ -532,21 +704,12 @@ export default function EncadreurNotification() {
                             </div>
 
                             <p className="text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                              {notification.description}
+                              {notification.message}
                             </p>
 
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-500">
-                                <div className="flex items-center gap-1">
-                                  <Avatar className="h-5 w-5">
-                                    <AvatarFallback className="text-xs bg-gray-200 dark:bg-gray-700">
-                                      {notification.emetteur[0]}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span>{notification.emetteur}</span>
-                                </div>
-                                <span>•</span>
-                                <span>{formatDate(notification.date)}</span>
+                                <span>{notification.formattedTime}</span>
                               </div>
 
                               <div className="flex gap-2">
@@ -554,28 +717,53 @@ export default function EncadreurNotification() {
                                   variant="ghost"
                                   size="sm"
                                   className="h-8 w-8 p-0 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                  onClick={() => supprimerNotification(notification.id)}
+                                  onClick={() => supprimerNotification(notification.documentId)}
+                                  disabled={updating}
                                   title="Supprimer"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  {updating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
                                 </Button>
-                                {!notification.lu && (
+                                {!notification.lue ? (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                                    onClick={() => marquerCommeLu(notification.id)}
+                                    onClick={() => marquerCommeLu(notification.documentId)}
+                                    disabled={updating}
                                     title="Marquer comme lu"
                                   >
-                                    <CheckCircle className="h-4 w-4" />
+                                    {updating ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <EyeOff className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300"
+                                    title="Déjà lue"
+                                    disabled
+                                  >
+                                    <Eye className="h-4 w-4" />
                                   </Button>
                                 )}
                                 <Button
                                   size="sm"
                                   className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                                   onClick={() => handleAction(notification)}
+                                  disabled={updating}
                                 >
-                                  Voir
+                                  {updating ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    "Voir"
+                                  )}
                                 </Button>
                               </div>
                             </div>
@@ -597,7 +785,10 @@ export default function EncadreurNotification() {
                     Aucune notification trouvée
                   </h3>
                   <p className="text-gray-400 dark:text-gray-500">
-                    Aucune notification ne correspond à vos critères de recherche.
+                    {recherche || filtreType !== "tous" || filtreStatut !== "tous" 
+                      ? "Aucune notification ne correspond à vos critères de recherche."
+                      : "Vous n'avez aucune notification pour le moment."
+                    }
                   </p>
                 </motion.div>
               )}
@@ -671,9 +862,13 @@ export default function EncadreurNotification() {
                   variant="outline"
                   className="w-full gap-2 border-gray-300 dark:border-gray-600"
                   onClick={marquerToutCommeLu}
-                  disabled={stats.nonLus === 0}
+                  disabled={stats.nonLus === 0 || updating}
                 >
-                  <CheckCheck className="h-4 w-4" />
+                  {updating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CheckCheck className="h-4 w-4" />
+                  )}
                   Tout marquer comme lu
                 </Button>
                 
@@ -681,9 +876,13 @@ export default function EncadreurNotification() {
                   variant="outline"
                   className="w-full gap-2 border-red-300 dark:border-red-600 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                   onClick={supprimerToutesNotifications}
-                  disabled={notifications.length === 0}
+                  disabled={notifications.length === 0 || updating}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  {updating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
                   Supprimer toutes les notifications
                 </Button>
               </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Search,
@@ -15,7 +15,8 @@ import {
   TrendingUp,
   BarChart3,
   CheckSquare,
-  ListChecks
+  ListChecks,
+  Bell
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -51,218 +54,120 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration
-const stageActuel = {
-  id: 1,
-  titre: "Stage Développement Fullstack",
-  entreprise: "TechCorp Solutions",
-  progression: 75,
-  encadreur: "Thomas Leroy",
-  dateDebut: "2024-09-01",
-  dateFin: "2025-02-28"
-};
-
-const tachesData = [
-  {
-    id: 1,
-    titre: "Développement module authentification",
-    description: "Création du système de connexion sécurisé avec JWT et gestion des rôles utilisateurs",
-    dateCreation: "2024-09-10",
-    dateEcheance: "2024-12-20",
-    priorite: "haute",
-    statut: "en_cours",
-    progression: 80,
-    competences: ["React", "Node.js", "JWT", "MongoDB"],
-    tempsEstime: "40 heures",
-    notes: "Intégrer avec le système existant et respecter les normes de sécurité",
-    sousTaches: [
-      { id: 1, titre: "Configuration JWT", terminee: true },
-      { id: 2, titre: "Middleware d'authentification", terminee: true },
-      { id: 3, titre: "Gestion des rôles", terminee: false },
-      { id: 4, titre: "Tests de sécurité", terminee: false }
-    ]
-  },
-  {
-    id: 2,
-    titre: "Documentation API",
-    description: "Rédaction complète de la documentation Swagger pour l'API REST",
-    dateCreation: "2024-11-15",
-    dateEcheance: "2024-12-25",
-    priorite: "moyenne",
-    statut: "a_faire",
-    progression: 0,
-    competences: ["Swagger", "Documentation", "API Design"],
-    tempsEstime: "20 heures",
-    notes: "Inclure des exemples d'utilisation pour chaque endpoint",
-    sousTaches: [
-      { id: 1, titre: "Structure Swagger", terminee: false },
-      { id: 2, titre: "Documentation endpoints", terminee: false },
-      { id: 3, titre: "Exemples d'utilisation", terminee: false }
-    ]
-  },
-  {
-    id: 3,
-    titre: "Tests unitaires",
-    description: "Implémentation des tests Jest pour les composants critiques",
-    dateCreation: "2024-10-05",
-    dateEcheance: "2024-12-18",
-    priorite: "haute",
-    statut: "termine",
-    progression: 100,
-    competences: ["Jest", "Testing", "React Testing Library"],
-    tempsEstime: "30 heures",
-    notes: "Cibler une couverture de tests > 80%",
-    sousTaches: [
-      { id: 1, titre: "Setup Jest", terminee: true },
-      { id: 2, titre: "Tests composants", terminee: true },
-      { id: 3, titre: "Tests services", terminee: true },
-      { id: 4, titre: "Rapport couverture", terminee: true }
-    ]
-  },
-  {
-    id: 4,
-    titre: "Refactoring base de données",
-    description: "Optimisation des schémas MongoDB et création d'index",
-    dateCreation: "2024-11-20",
-    dateEcheance: "2025-01-10",
-    priorite: "moyenne",
-    statut: "a_faire",
-    progression: 0,
-    competences: ["MongoDB", "Optimisation", "Indexation"],
-    tempsEstime: "25 heures",
-    notes: "Analyser les performances actuelles avant refactoring",
-    sousTaches: [
-      { id: 1, titre: "Analyse performance", terminee: false },
-      { id: 2, titre: "Refactoring schémas", terminee: false },
-      { id: 3, titre: "Création index", terminee: false }
-    ]
-  },
-  {
-    id: 5,
-    titre: "Interface dashboard admin",
-    description: "Création de l'interface d'administration avec React et Material-UI",
-    dateCreation: "2024-12-01",
-    dateEcheance: "2025-01-15",
-    priorite: "basse",
-    statut: "en_cours",
-    progression: 40,
-    competences: ["React", "Material-UI", "Dashboard Design"],
-    tempsEstime: "35 heures",
-    notes: "Respecter la charte graphique de l'entreprise",
-    sousTaches: [
-      { id: 1, titre: "Maquette Figma", terminee: true },
-      { id: 2, titre: "Composants base", terminee: true },
-      { id: 3, titre: "Intégration données", terminee: false },
-      { id: 4, titre: "Responsive design", terminee: false }
-    ]
-  }
-];
-
 export default function StagiaireTache() {
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [filtrePriorite, setFiltrePriorite] = useState("tous");
   const [recherche, setRecherche] = useState("");
-  const [taches, setTaches] = useState(tachesData);
+  const [taches, setTaches] = useState([]);
+  const [stageActuel, setStageActuel] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const getStatutColor = (statut) => {
-    switch (statut) {
-      case 'termine': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
-      case 'en_cours': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
-      case 'a_faire': return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
-      default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
-    }
-  };
+  // Configuration API
+  const API_BASE_URL = "http://localhost:9090/api";
 
-  const getPrioriteColor = (priorite) => {
-    switch (priorite) {
-      case 'haute': return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300';
-      case 'moyenne': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300';
-      case 'basse': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300';
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
-    }
-  };
+  // Charger les tâches du stage en cours
+  const fetchTaches = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer l'ID du stagiaire connecté
+      const user = JSON.parse(localStorage.getItem("user"));
+      const stagiaireId = user?.entityDocumentId;
+      
+      if (!stagiaireId) {
+        toast.error("Impossible de récupérer les informations du stagiaire");
+        return;
+      }
 
-  const getStatutIcon = (statut) => {
-    switch (statut) {
-      case 'termine': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
-      case 'en_cours': return <PlayCircle className="h-4 w-4 text-blue-500" />;
-      case 'a_faire': return <Clock className="h-4 w-4 text-gray-500" />;
-      default: return <Clock className="h-4 w-4 text-gray-500" />;
-    }
-  };
+      // Récupérer les stages du stagiaire
+      const stagesResponse = await axios.get(`${API_BASE_URL}/stages/stagiaire/${stagiaireId}`);
+      const stagesStagiaire = stagesResponse.data;
 
-  // Composant de barre de progression personnalisée
-  const CustomProgressBar = ({ value, className = "" }) => {
-    const getColor = (val) => {
-      if (val >= 80) return 'bg-emerald-500';
-      if (val >= 60) return 'bg-blue-500';
-      if (val >= 40) return 'bg-amber-500';
-      return 'bg-red-500';
-    };
+      // Trouver le stage en cours
+      const stageEnCours = stagesStagiaire.find(stage => stage.statutStage === 'EN_COURS');
+      
+      if (!stageEnCours) {
+        setStageActuel(null);
+        setTaches([]);
+        return;
+      }
 
-    return (
-      <div className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 ${className}`}>
-        <motion.div
-          className={`h-2 rounded-full ${getColor(value)}`}
-          initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          transition={{ duration: 1, delay: 0.2 }}
-        />
-      </div>
-    );
-  };
+      // Récupérer les détails complets du stage
+      const stageDetailResponse = await axios.get(`${API_BASE_URL}/stages/${stageEnCours.documentId}`);
+      const stageDetail = stageDetailResponse.data;
 
-  const tachesFiltres = taches.filter(tache => {
-    const correspondRecherche = 
-      tache.titre.toLowerCase().includes(recherche.toLowerCase()) ||
-      tache.description.toLowerCase().includes(recherche.toLowerCase());
-    
-    const correspondStatut = filtreStatut === "tous" || tache.statut === filtreStatut;
-    const correspondPriorite = filtrePriorite === "tous" || tache.priorite === filtrePriorite;
-    
-    return correspondRecherche && correspondStatut && correspondPriorite;
-  });
+      // Récupérer les informations de l'encadreur
+      let encadreurNom = "Non assigné";
+      let encadreurId = null;
+      if (stageDetail.encadreurDocumentId) {
+        try {
+          const encadreurResponse = await axios.get(`${API_BASE_URL}/encadreurs/${stageDetail.encadreurDocumentId}`);
+          const encadreur = encadreurResponse.data;
+          encadreurNom = `${encadreur.prenom} ${encadreur.nom}`;
+          encadreurId = encadreur.documentId;
+        } catch (error) {
+          console.error("Erreur récupération encadreur:", error);
+        }
+      }
 
-  const handleCommencerTache = (tacheId) => {
-    setTaches(prev => prev.map(tache => 
-      tache.id === tacheId 
-        ? { ...tache, statut: 'en_cours', progression: 10 }
-        : tache
-    ));
-    // Mettre à jour la progression du stage
-    console.log('Tâche commencée:', tacheId);
-  };
+      // Récupérer les informations du supérieur hiérarchique (entreprise)
+      let entreprise = "Entreprise non spécifiée";
+      if (stageDetail.superieurHierarchiqueDocumentId) {
+        try {
+          const superieurResponse = await axios.get(`${API_BASE_URL}/superieurs-hierarchiques/${stageDetail.superieurHierarchiqueDocumentId}`);
+          const superieur = superieurResponse.data;
+          entreprise = superieur.departement || "Entreprise non spécifiée";
+        } catch (error) {
+          console.error("Erreur récupération supérieur:", error);
+        }
+      }
 
-  const handleTerminerTache = (tacheId) => {
-    setTaches(prev => prev.map(tache => 
-      tache.id === tacheId 
-        ? { ...tache, statut: 'termine', progression: 100 }
-        : tache
-    ));
-    // Mettre à jour la progression du stage
-    console.log('Tâche terminée:', tacheId);
-  };
+      // Calculer la progression du stage
+      const maintenant = new Date();
+      const dateDebut = new Date(stageDetail.dateDebut);
+      const dateFin = new Date(stageDetail.dateFin);
+      const dureeTotale = dateFin - dateDebut;
+      const tempsEcoule = maintenant - dateDebut;
+      const progressionStage = Math.min(100, Math.max(0, (tempsEcoule / dureeTotale) * 100));
 
-  const handleToggleSousTache = (tacheId, sousTacheId) => {
-    setTaches(prev => prev.map(tache => {
-      if (tache.id === tacheId) {
-        const sousTachesMaj = tache.sousTaches.map(st => 
-          st.id === sousTacheId ? { ...st, terminee: !st.terminee } : st
-        );
-        const progression = (sousTachesMaj.filter(st => st.terminee).length / sousTachesMaj.length) * 100;
+      setStageActuel({
+        ...stageDetail,
+        encadreurNom,
+        encadreurId,
+        entreprise,
+        progression: Math.round(progressionStage)
+      });
+
+      // Récupérer les tâches du stage
+      const tachesResponse = await axios.get(`${API_BASE_URL}/taches/stage/${stageEnCours.documentId}`);
+      const tachesData = tachesResponse.data;
+
+      // Enrichir les données des tâches
+      const tachesEnrichies = tachesData.map(tache => {
+        const joursRestants = calculateDaysRemaining(tache.dateFin);
+        const estEnRetard = tache.dateFin && new Date(tache.dateFin) < new Date() && tache.statut !== 'TERMINEE';
         
         return {
           ...tache,
-          sousTaches: sousTachesMaj,
-          progression: progression,
-          statut: progression === 100 ? 'termine' : progression > 0 ? 'en_cours' : 'a_faire'
+          joursRestants,
+          estEnRetard,
+          competences: getCompetencesFromDescription(tache.description),
+          tempsEstime: "À estimer"
         };
-      }
-      return tache;
-    }));
+      });
+
+      setTaches(tachesEnrichies);
+    } catch (error) {
+      console.error("Erreur lors du chargement des tâches:", error);
+      toast.error("Erreur lors du chargement des tâches");
+    } finally {
+      setLoading(false);
+    }
   };
 
+  // Fonction utilitaire pour calculer les jours restants
   const calculateDaysRemaining = (dateEcheance) => {
+    if (!dateEcheance) return null;
     const today = new Date();
     const echeance = new Date(dateEcheance);
     const diffTime = echeance - today;
@@ -270,14 +175,195 @@ export default function StagiaireTache() {
     return diffDays;
   };
 
+  // Fonction pour extraire les compétences de la description
+  const getCompetencesFromDescription = (description) => {
+    if (!description) return ["Développement", "Collaboration"];
+    
+    const competences = [];
+    if (description.toLowerCase().includes('react')) competences.push("React");
+    if (description.toLowerCase().includes('node')) competences.push("Node.js");
+    if (description.toLowerCase().includes('mongodb')) competences.push("MongoDB");
+    if (description.toLowerCase().includes('javascript')) competences.push("JavaScript");
+    if (description.toLowerCase().includes('typescript')) competences.push("TypeScript");
+    if (description.toLowerCase().includes('api')) competences.push("API Design");
+    if (description.toLowerCase().includes('test')) competences.push("Testing");
+    
+    return competences.length > 0 ? competences : ["Développement", "Collaboration"];
+  };
+
+  // Fonction pour créer une notification
+  const creerNotification = async (titre, message, type, destinataireId, referenceId, typeReference) => {
+    try {
+      // Récupérer le compte utilisateur du destinataire
+      const compteResponse = await axios.get(
+        `${API_BASE_URL}/comptes-utilisateurs/entity/${destinataireId}/type/ENCADREUR`
+      );
+      
+      if (compteResponse.data) {
+        const compteDestinataire = compteResponse.data;
+        
+        await axios.post(`${API_BASE_URL}/notifications/create`, {
+          titre,
+          message,
+          type,
+          compteUtilisateurDocumentId: compteDestinataire.documentId,
+          documentIdReference: referenceId,
+          typeReference
+        });
+      }
+    } catch (notifError) {
+      console.error("Erreur création notification:", notifError);
+    }
+  };
+
+  useEffect(() => {
+    fetchTaches();
+  }, []);
+
+  const getStatutColor = (statut) => {
+    switch (statut) {
+      case 'TERMINEE': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'EN_COURS': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
+      case 'A_FAIRE': return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+      default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
+    }
+  };
+
+  const getStatutLabel = (statut) => {
+    switch (statut) {
+      case 'TERMINEE': return 'Terminée';
+      case 'EN_COURS': return 'En cours';
+      case 'A_FAIRE': return 'À faire';
+      default: return statut;
+    }
+  };
+
+  const getPrioriteColor = (priorite) => {
+    switch (priorite) {
+      case 1: return 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300';
+      case 2: return 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300';
+      case 3: return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300';
+      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    }
+  };
+
+  const getPrioriteLabel = (priorite) => {
+    switch (priorite) {
+      case 1: return 'Haute';
+      case 2: return 'Moyenne';
+      case 3: return 'Basse';
+      default: return 'Non définie';
+    }
+  };
+
+  const getStatutIcon = (statut) => {
+    switch (statut) {
+      case 'TERMINEE': return <CheckCircle className="h-4 w-4 text-emerald-500" />;
+      case 'EN_COURS': return <PlayCircle className="h-4 w-4 text-blue-500" />;
+      case 'A_FAIRE': return <Clock className="h-4 w-4 text-gray-500" />;
+      default: return <Clock className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const tachesFiltres = taches.filter(tache => {
+    const correspondRecherche = 
+      tache.titre?.toLowerCase().includes(recherche.toLowerCase()) ||
+      tache.description?.toLowerCase().includes(recherche.toLowerCase());
+    
+    const correspondStatut = filtreStatut === "tous" || tache.statut === filtreStatut;
+    const correspondPriorite = filtrePriorite === "tous" || tache.priorite?.toString() === filtrePriorite;
+    
+    return correspondRecherche && correspondStatut && correspondPriorite;
+  });
+
+  const handleCommencerTache = async (tache) => {
+    try {
+      await axios.put(`${API_BASE_URL}/taches/${tache.documentId}/statut/EN_COURS`);
+      
+      // Créer une notification pour l'encadreur
+      if (stageActuel.encadreurId) {
+        await creerNotification(
+          "Tâche commencée",
+          `Le stagiaire a commencé la tâche "${tache.titre}"`,
+          "RAPPEL_TACHE",
+          stageActuel.encadreurId,
+          tache.documentId,
+          "TACHE"
+        );
+      }
+      
+      toast.success("Tâche mise en cours - Notification envoyée à l'encadreur");
+      await fetchTaches(); // Recharger les données
+    } catch (error) {
+      console.error("Erreur mise en cours tâche:", error);
+      toast.error("Erreur lors de la mise à jour");
+    }
+  };
+
+  const handleTerminerTache = async (tache) => {
+    try {
+      await axios.put(`${API_BASE_URL}/taches/${tache.documentId}/statut/TERMINEE`);
+      
+      // Créer une notification pour l'encadreur
+      if (stageActuel.encadreurId) {
+        await creerNotification(
+          "Tâche terminée",
+          `Le stagiaire a terminé la tâche "${tache.titre}"`,
+          "RAPPEL_TACHE",
+          stageActuel.encadreurId,
+          tache.documentId,
+          "TACHE"
+        );
+      }
+      
+      toast.success(
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4" />
+          <span>Tâche terminée - Notification envoyée à l'encadreur</span>
+        </div>
+      );
+      await fetchTaches(); // Recharger les données
+    } catch (error) {
+      console.error("Erreur terminaison tâche:", error);
+      toast.error("Erreur lors de la mise à jour");
+    }
+  };
+
   const stats = {
     total: taches.length,
-    terminees: taches.filter(t => t.statut === 'termine').length,
-    enCours: taches.filter(t => t.statut === 'en_cours').length,
-    aFaire: taches.filter(t => t.statut === 'a_faire').length,
-    progressionMoyenne: Math.round(taches.reduce((acc, tache) => acc + tache.progression, 0) / taches.length),
-    urgentes: taches.filter(t => t.priorite === 'haute' && t.statut !== 'termine').length
+    terminees: taches.filter(t => t.statut === 'TERMINEE').length,
+    enCours: taches.filter(t => t.statut === 'EN_COURS').length,
+    aFaire: taches.filter(t => t.statut === 'A_FAIRE').length,
+    urgentes: taches.filter(t => t.priorite === 1 && t.statut !== 'TERMINEE').length,
+    enRetard: taches.filter(t => t.estEnRetard).length
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement de vos tâches...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!stageActuel) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <ListChecks className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">
+            Aucun stage en cours
+          </h3>
+          <p className="text-gray-400 dark:text-gray-500">
+            Vous n'avez pas de stage en cours actuellement.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -287,6 +373,21 @@ export default function StagiaireTache() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -321,7 +422,7 @@ export default function StagiaireTache() {
                     Stage en cours
                   </Badge>
                   <span className="text-sm text-gray-500 dark:text-gray-400">
-                    Encadré par {stageActuel.encadreur}
+                    Encadré par {stageActuel.encadreurNom}
                   </span>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
@@ -331,14 +432,13 @@ export default function StagiaireTache() {
                   {stageActuel.entreprise} • {new Date(stageActuel.dateDebut).toLocaleDateString()} - {new Date(stageActuel.dateFin).toLocaleDateString()}
                 </p>
               </div>
-              <div className="flex items-center gap-6">
+              <div className="flex items-center gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {stageActuel.progression}%
+                    {stats.terminees}/{stats.total}
                   </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">Progression</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Tâches terminées</div>
                 </div>
-                <CustomProgressBar value={stageActuel.progression} className="w-32" />
               </div>
             </div>
           </CardContent>
@@ -382,18 +482,18 @@ export default function StagiaireTache() {
             gradient: "from-blue-500 to-blue-600"
           },
           {
-            title: "En Cours",
+            title: "En Retard",
             icon: (
               <motion.div
                 animate={{ y: [0, -8, 0] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
-                <PlayCircle className="h-6 w-6 text-purple-600" />
+                <AlertCircle className="h-6 w-6 text-red-600" />
               </motion.div>
             ),
-            count: stats.enCours,
-            text: "En progression",
-            gradient: "from-purple-500 to-purple-600"
+            count: stats.enRetard,
+            text: "Tâches en retard",
+            gradient: "from-red-500 to-red-600"
           },
           {
             title: "Tâches Urgentes",
@@ -402,7 +502,7 @@ export default function StagiaireTache() {
                 animate={{ y: [-8, 0, -8] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               >
-                <AlertCircle className="h-6 w-6 text-amber-600" />
+                <Flag className="h-6 w-6 text-amber-600" />
               </motion.div>
             ),
             count: stats.urgentes,
@@ -461,9 +561,9 @@ export default function StagiaireTache() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Tous les statuts</SelectItem>
-                      <SelectItem value="a_faire">À faire</SelectItem>
-                      <SelectItem value="en_cours">En cours</SelectItem>
-                      <SelectItem value="termine">Terminées</SelectItem>
+                      <SelectItem value="A_FAIRE">À faire</SelectItem>
+                      <SelectItem value="EN_COURS">En cours</SelectItem>
+                      <SelectItem value="TERMINEE">Terminées</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -473,9 +573,9 @@ export default function StagiaireTache() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Toutes priorités</SelectItem>
-                      <SelectItem value="haute">Haute</SelectItem>
-                      <SelectItem value="moyenne">Moyenne</SelectItem>
-                      <SelectItem value="basse">Basse</SelectItem>
+                      <SelectItem value="1">Haute</SelectItem>
+                      <SelectItem value="2">Moyenne</SelectItem>
+                      <SelectItem value="3">Basse</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -497,167 +597,137 @@ export default function StagiaireTache() {
         className="space-y-6"
       >
         <AnimatePresence>
-          {tachesFiltres.map((tache) => {
-            const joursRestants = calculateDaysRemaining(tache.dateEcheance);
-            
-            return (
-              <motion.div
-                key={tache.id}
-                variants={cardVariants}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.3 }}
-              >
-                <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
-                  <div className="p-6">
-                    {/* En-tête de la tâche */}
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className="flex items-center gap-2">
-                            {getStatutIcon(tache.statut)}
-                            <Badge className={getStatutColor(tache.statut)}>
-                              {tache.statut === 'termine' ? 'Terminée' : tache.statut === 'en_cours' ? 'En cours' : 'À faire'}
-                            </Badge>
-                          </div>
-                          <Badge className={getPrioriteColor(tache.priorite)}>
-                            Priorité {tache.priorite}
+          {tachesFiltres.map((tache) => (
+            <motion.div
+              key={tache.documentId}
+              variants={cardVariants}
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.3 }}
+            >
+              <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl hover:shadow-2xl transition-all duration-300 rounded-2xl overflow-hidden">
+                <div className="p-6">
+                  {/* En-tête de la tâche */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="flex items-center gap-2">
+                          {getStatutIcon(tache.statut)}
+                          <Badge className={getStatutColor(tache.statut)}>
+                            {getStatutLabel(tache.statut)}
                           </Badge>
-                          {joursRestants <= 3 && joursRestants > 0 && (
-                            <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
-                              {joursRestants} jour(s)
-                            </Badge>
-                          )}
-                          {joursRestants < 0 && (
-                            <Badge className="bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300">
-                              En retard
-                            </Badge>
-                          )}
                         </div>
-                        <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
-                          {tache.titre}
-                        </h3>
-                        <p className="text-gray-600 dark:text-gray-400 mb-3">
-                          {tache.description}
-                        </p>
+                        <Badge className={getPrioriteColor(tache.priorite)}>
+                          Priorité {getPrioriteLabel(tache.priorite)}
+                        </Badge>
+                        {tache.estEnRetard && (
+                          <Badge className="bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            En retard
+                          </Badge>
+                        )}
+                        {tache.joursRestants !== null && tache.joursRestants <= 3 && tache.joursRestants > 0 && !tache.estEnRetard && (
+                          <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                            <Clock className="h-3 w-3 mr-1" />
+                            {tache.joursRestants} jour(s)
+                          </Badge>
+                        )}
                       </div>
+                      <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
+                        {tache.titre}
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-400 mb-3">
+                        {tache.description}
+                      </p>
                     </div>
+                  </div>
 
-                    {/* Informations détaillées */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                      <div className="space-y-2">
+                  {/* Informations détaillées */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="space-y-2">
+                      {tache.dateFin && (
                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                           <Calendar className="h-4 w-4" />
-                          <span>Échéance: {new Date(tache.dateEcheance).toLocaleDateString()}</span>
+                          <span>Échéance: {new Date(tache.dateFin).toLocaleDateString()}</span>
                         </div>
+                      )}
+                      {tache.dateDebut && (
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Clock className="h-4 w-4" />
+                          <span>Début: {new Date(tache.dateDebut).toLocaleDateString()}</span>
+                        </div>
+                      )}
+                      {tache.tempsEstime && (
                         <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                           <Clock className="h-4 w-4" />
                           <span>Temps estimé: {tache.tempsEstime}</span>
                         </div>
-                        {tache.notes && (
-                          <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
-                            <FileText className="h-4 w-4 mt-0.5" />
-                            <span>{tache.notes}</span>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Compétences
-                        </div>
-                        <div className="flex flex-wrap gap-1">
-                          {tache.competences.map((competence, index) => (
-                            <Badge key={index} variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                              {competence}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
+                      )}
                     </div>
-
-                    {/* Sous-tâches */}
-                    {tache.sousTaches && tache.sousTaches.length > 0 && (
-                      <div className="mb-4">
-                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Sous-tâches ({tache.sousTaches.filter(st => st.terminee).length}/{tache.sousTaches.length})
-                        </div>
-                        <div className="space-y-2">
-                          {tache.sousTaches.map((sousTache) => (
-                            <div key={sousTache.id} className="flex items-center gap-3">
-                              <button
-                                onClick={() => handleToggleSousTache(tache.id, sousTache.id)}
-                                className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                  sousTache.terminee
-                                    ? 'bg-emerald-500 border-emerald-500 text-white'
-                                    : 'border-gray-300 dark:border-gray-600 hover:border-emerald-500'
-                                }`}
-                              >
-                                {sousTache.terminee && <CheckCircle className="h-3 w-3" />}
-                              </button>
-                              <span className={`text-sm ${
-                                sousTache.terminee
-                                  ? 'text-gray-500 dark:text-gray-400 line-through'
-                                  : 'text-gray-700 dark:text-gray-300'
-                              }`}>
-                                {sousTache.titre}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
+                    
+                    <div>
+                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Compétences
                       </div>
-                    )}
-
-                    {/* Progression et actions */}
-                    <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700/50">
-                      <div className="flex-1">
-                        <div className="flex justify-between text-sm mb-2">
-                          <span className="text-gray-600 dark:text-gray-400">Progression</span>
-                          <span className="font-semibold text-emerald-600">{tache.progression}%</span>
-                        </div>
-                        <CustomProgressBar value={tache.progression} />
-                      </div>
-                      
-                      <div className="flex gap-2 ml-4">
-                        {tache.statut === 'a_faire' && (
-                          <Button
-                            onClick={() => handleCommencerTache(tache.id)}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                            size="sm"
-                          >
-                            <PlayCircle className="h-4 w-4 mr-1" />
-                            Commencer
-                          </Button>
-                        )}
-                        {tache.statut === 'en_cours' && (
-                          <Button
-                            onClick={() => handleTerminerTache(tache.id)}
-                            className="bg-blue-600 hover:bg-blue-700"
-                            size="sm"
-                          >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Terminer
-                          </Button>
-                        )}
-                        {tache.statut === 'termine' && (
-                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300">
-                            Terminée
+                      <div className="flex flex-wrap gap-1">
+                        {tache.competences.map((competence, index) => (
+                          <Badge key={index} variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
+                            {competence}
                           </Badge>
-                        )}
+                        ))}
                       </div>
                     </div>
                   </div>
-                </Card>
-              </motion.div>
-            );
-          })}
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-between pt-4 border-t border-gray-100 dark:border-gray-700/50">
+                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                      <div className="flex items-center gap-1">
+                        <Bell className="h-4 w-4" />
+                        <span>L'encadreur sera notifié</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      {tache.statut === 'A_FAIRE' && (
+                        <Button
+                          onClick={() => handleCommencerTache(tache)}
+                          className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+                          size="sm"
+                        >
+                          <PlayCircle className="h-4 w-4" />
+                          Commencer
+                        </Button>
+                      )}
+                      {tache.statut === 'EN_COURS' && (
+                        <Button
+                          onClick={() => handleTerminerTache(tache)}
+                          className="bg-blue-600 hover:bg-blue-700 gap-2"
+                          size="sm"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Terminer
+                        </Button>
+                      )}
+                      {tache.statut === 'TERMINEE' && (
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300 gap-1">
+                          <CheckCircle className="h-3 w-3" />
+                          Terminée
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          ))}
         </AnimatePresence>
       </motion.div>
 
       {/* Message si aucun résultat */}
-      {tachesFiltres.length === 0 && (
+      {tachesFiltres.length === 0 && !loading && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -666,10 +736,13 @@ export default function StagiaireTache() {
         >
           <CheckSquare className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">
-            Aucune tâche trouvée
+            {taches.length === 0 ? "Aucune tâche assignée" : "Aucune tâche trouvée"}
           </h3>
           <p className="text-gray-400 dark:text-gray-500">
-            Aucune tâche ne correspond à vos critères de recherche.
+            {taches.length === 0 
+              ? "Aucune tâche n'a été assignée à votre stage en cours." 
+              : "Aucune tâche ne correspond à vos critères de recherche."
+            }
           </p>
         </motion.div>
       )}

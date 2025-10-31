@@ -8,15 +8,29 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Eye, EyeOff, User, Lock, Mail, Building2, Users, GraduationCap, Briefcase, Clock } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Eye, EyeOff, User, Lock, Mail, Building2, Users, GraduationCap, Briefcase, Clock, Search, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 const Login = () => {
   const [activeTab, setActiveTab] = useState('login');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationStatus, setVerificationStatus] = useState(null);
+  const [userType, setUserType] = useState('');
+  const [userDetails, setUserDetails] = useState(null);
+  
   const [formData, setFormData] = useState({
     email: '',
     password: ''
+  });
+
+  const [registerData, setRegisterData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    userType: ''
   });
 
   // Animations pour le conteneur principal
@@ -123,6 +137,15 @@ const Login = () => {
 
   const handleTabChange = (value) => {
     setActiveTab(value);
+    setVerificationStatus(null);
+    setUserType('');
+    setUserDetails(null);
+    setRegisterData({
+      email: '',
+      password: '',
+      confirmPassword: '',
+      userType: ''
+    });
   };
 
   const handleInputChange = (e) => {
@@ -133,7 +156,139 @@ const Login = () => {
     }));
   };
 
-  const handleSubmit = async (e) => {
+  const handleRegisterInputChange = (e) => {
+    const { name, value } = e.target;
+    setRegisterData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleUserTypeChange = (value) => {
+    setUserType(value);
+    setRegisterData(prev => ({
+      ...prev,
+      userType: value
+    }));
+    setVerificationStatus(null);
+    setUserDetails(null);
+  };
+
+  // Vérifier si l'utilisateur existe dans la base de données ET s'il n'a pas déjà de compte du même type
+  const verifyUserExists = async () => {
+    if (!registerData.email || !userType) {
+      toast.error('Veuillez remplir l\'email et sélectionner un type d\'utilisateur');
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationStatus(null);
+    setUserDetails(null);
+
+    try {
+      // D'abord, vérifier si un compte existe déjà avec cet email
+      try {
+        const comptesResponse = await axios.get(`http://localhost:9090/api/comptes-utilisateurs/email/${registerData.email}`);
+        
+        if (comptesResponse.data) {
+          const existingCompte = comptesResponse.data;
+          
+          // Vérifier si le compte existant a le même type
+          if (existingCompte.typeCompte === userType) {
+            setVerificationStatus('already_exists_same_type');
+            setUserDetails({
+              type: 'EXISTING_ACCOUNT_SAME_TYPE',
+              message: `Un compte ${getUserTypeLabel(userType)} existe déjà avec cet email`
+            });
+            toast.error(`Un compte ${getUserTypeLabel(userType)} existe déjà avec cet email`);
+            return;
+          } else {
+            // Compte existe mais avec un type différent
+            setVerificationStatus('already_exists_different_type');
+            setUserDetails({
+              type: 'EXISTING_ACCOUNT_DIFFERENT_TYPE',
+              existingType: existingCompte.typeCompte,
+              message: `Un compte ${getUserTypeLabel(existingCompte.typeCompte)} existe déjà avec cet email`
+            });
+            toast.error(`Un compte ${getUserTypeLabel(existingCompte.typeCompte)} existe déjà avec cet email`);
+            return;
+          }
+        }
+      } catch (error) {
+        // Si erreur 404, c'est qu'aucun compte n'existe - c'est ce qu'on veut
+        if (error.response?.status !== 404) {
+          throw error;
+        }
+      }
+
+      // Ensuite, vérifier si l'utilisateur existe dans la table métier correspondante
+      let endpoint = '';
+      let entityLabel = '';
+      switch (userType) {
+        case 'SUPERIEUR_HIERARCHIQUE':
+          endpoint = 'superieurs-hierarchiques';
+          entityLabel = 'supérieur hiérarchique';
+          break;
+        case 'ENCADREUR':
+          endpoint = 'encadreurs';
+          entityLabel = 'encadreur';
+          break;
+        case 'STAGIAIRE':
+          endpoint = 'stagiaires';
+          entityLabel = 'stagiaire';
+          break;
+        default:
+          throw new Error('Type d\'utilisateur invalide');
+      }
+
+      const response = await axios.get(`http://localhost:9090/api/${endpoint}/email/${registerData.email}`);
+      
+      if (response.data) {
+        setVerificationStatus('success');
+        setUserDetails({
+          type: 'FOUND_IN_DATABASE',
+          data: response.data,
+          message: `${getUserTypeLabel(userType)} vérifié(e) - Vous pouvez créer votre compte`
+        });
+        toast.success(`${getUserTypeLabel(userType)} vérifié(e) ! Vous pouvez maintenant créer votre compte`);
+      } else {
+        setVerificationStatus('not_found');
+        setUserDetails({
+          type: 'NOT_FOUND',
+          message: `${getUserTypeLabel(userType)} non trouvé(e) dans notre base de données`
+        });
+        toast.error(`${getUserTypeLabel(userType)} non trouvé(e) dans notre base de données`);
+      }
+    } catch (error) {
+      if (error.response?.status === 404) {
+        setVerificationStatus('not_found');
+        setUserDetails({
+          type: 'NOT_FOUND',
+          message: `${getUserTypeLabel(userType)} non trouvé(e) dans notre base de données`
+        });
+        toast.error(`${getUserTypeLabel(userType)} non trouvé(e) dans notre base de données`);
+      } else {
+        setVerificationStatus('error');
+        toast.error('Erreur lors de la vérification');
+        console.error('Verification error:', error);
+      }
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  // Fonction utilitaire pour obtenir le libellé du type d'utilisateur
+  const getUserTypeLabel = (type) => {
+    const labels = {
+      'SUPERIEUR_HIERARCHIQUE': 'supérieur hiérarchique',
+      'ENCADREUR': 'encadreur',
+      'STAGIAIRE': 'stagiaire',
+      'ADMIN': 'administrateur'
+    };
+    return labels[type] || type;
+  };
+
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     
@@ -232,6 +387,68 @@ const Login = () => {
     }
   };
 
+  const handleRegisterSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!verificationStatus || verificationStatus !== 'success') {
+      toast.error('Veuillez d\'abord vérifier votre email');
+      return;
+    }
+
+    if (registerData.password !== registerData.confirmPassword) {
+      toast.error('Les mots de passe ne correspondent pas');
+      return;
+    }
+
+    if (registerData.password.length < 6) {
+      toast.error('Le mot de passe doit contenir au moins 6 caractères');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      // Créer le compte utilisateur avec l'entityDocumentId correct
+      const response = await axios.post('http://localhost:9090/api/comptes-utilisateurs/create-for-entity', {
+        email: registerData.email,
+        password: registerData.password,
+        typeCompte: userType,
+        entityDocumentId: userDetails.data.documentId
+      });
+
+      if (response.status === 200) {
+        toast.success('Compte créé avec succès ! Vous pouvez maintenant vous connecter', {
+          duration: 5000,
+          position: 'top-right',
+          style: {
+            background: '#10b981',
+            color: 'white',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        });
+        
+        // Basculer vers l'onglet de connexion
+        setTimeout(() => {
+          setActiveTab('login');
+          setFormData(prev => ({ ...prev, email: registerData.email }));
+        }, 2000);
+      }
+    } catch (error) {
+      if (error.response?.status === 400) {
+        toast.error('Un compte existe déjà avec cet email');
+        setVerificationStatus('already_exists_same_type');
+      } else {
+        toast.error('Erreur lors de la création du compte');
+        console.error('Registration error:', error);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Fonction utilitaire pour la redirection
   const getDashboardRoute = (userType) => {
     const routes = {
@@ -241,6 +458,73 @@ const Login = () => {
       'STAGIAIRE': '/stagiaire/dashboard'
     };
     return routes[userType] || '/login';
+  };
+
+  // Rendu du statut de vérification
+  const renderVerificationStatus = () => {
+    if (!verificationStatus) return null;
+
+    const statusConfig = {
+      success: {
+        icon: CheckCircle,
+        bgColor: 'bg-green-50',
+        textColor: 'text-green-700',
+        borderColor: 'border-green-200',
+        message: userDetails?.message || 'Utilisateur vérifié - Vous pouvez créer votre compte'
+      },
+      not_found: {
+        icon: XCircle,
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-700',
+        borderColor: 'border-red-200',
+        message: userDetails?.message || 'Utilisateur non trouvé dans notre base de données'
+      },
+      already_exists_same_type: {
+        icon: AlertCircle,
+        bgColor: 'bg-orange-50',
+        textColor: 'text-orange-700',
+        borderColor: 'border-orange-200',
+        message: userDetails?.message || 'Un compte existe déjà avec cet email'
+      },
+      already_exists_different_type: {
+        icon: AlertCircle,
+        bgColor: 'bg-blue-50',
+        textColor: 'text-blue-700',
+        borderColor: 'border-blue-200',
+        message: userDetails?.message || 'Un compte existe déjà avec cet email mais avec un type différent'
+      },
+      error: {
+        icon: XCircle,
+        bgColor: 'bg-red-50',
+        textColor: 'text-red-700',
+        borderColor: 'border-red-200',
+        message: 'Erreur lors de la vérification'
+      }
+    };
+
+    const config = statusConfig[verificationStatus];
+    const IconComponent = config.icon;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        className={`flex items-center gap-2 text-sm p-3 rounded-lg ${config.bgColor} ${config.textColor} ${config.borderColor} border`}
+      >
+        <IconComponent className="w-4 h-4 flex-shrink-0" />
+        <span className="flex-1">{config.message}</span>
+        {(verificationStatus === 'already_exists_same_type' || verificationStatus === 'already_exists_different_type') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setActiveTab('login')}
+            className={`${verificationStatus === 'already_exists_same_type' ? 'text-orange-700 hover:text-orange-800 hover:bg-orange-100' : 'text-blue-700 hover:text-blue-800 hover:bg-blue-100'}`}
+          >
+            Se connecter
+          </Button>
+        )}
+      </motion.div>
+    );
   };
 
   return (
@@ -439,7 +723,7 @@ const Login = () => {
                           <TabsContent value={activeTab} className="m-0">
                             {activeTab === 'login' ? (
                               <motion.form 
-                                onSubmit={handleSubmit} 
+                                onSubmit={handleLoginSubmit} 
                                 className="space-y-4"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -542,42 +826,156 @@ const Login = () => {
                               </motion.form>
                             ) : (
                               <motion.form 
-                                onSubmit={handleSubmit} 
+                                onSubmit={handleRegisterSubmit} 
                                 className="space-y-4"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
                                 transition={{ delay: 0.1 }}
                               >
-                                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                                  {[
-                                    { id: 'name', label: 'Nom complet', icon: User, type: 'text', placeholder: 'Votre nom complet', delay: 0.15, colSpan: 'xl:col-span-2' },
-                                    { id: 'register-email', label: 'Email', icon: Mail, type: 'email', placeholder: 'professionnel@entreprise.com', delay: 0.2, colSpan: 'xl:col-span-2' },
-                                    { id: 'company', label: 'Entreprise', icon: Building2, type: 'text', placeholder: 'Nom entreprise', delay: 0.25, colSpan: 'xl:col-span-2' },
-                                    { id: 'register-password', label: 'Mot de passe', icon: Lock, type: 'password', placeholder: 'Mot de passe', delay: 0.3, colSpan: 'xl:col-span-1' },
-                                    { id: 'confirm-password', label: 'Confirmation', icon: Lock, type: 'password', placeholder: 'Confirmez', delay: 0.35, colSpan: 'xl:col-span-1' }
-                                  ].map((field, index) => (
-                                    <motion.div 
-                                      key={field.id}
-                                      className={`space-y-2 ${field.colSpan}`}
-                                      initial={{ opacity: 0, y: 5 }}
-                                      animate={{ opacity: 1, y: 0 }}
-                                      transition={{ delay: field.delay }}
+                                {/* Type d'utilisateur */}
+                                <motion.div 
+                                  className="space-y-2"
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: 0.15 }}
+                                >
+                                  <Label htmlFor="userType" className="text-sm font-semibold flex items-center">
+                                    <User className="w-4 h-4 mr-2" />
+                                    Type d'utilisateur
+                                  </Label>
+                                  <Select value={userType} onValueChange={handleUserTypeChange}>
+                                    <SelectTrigger className="h-12">
+                                      <SelectValue placeholder="Sélectionnez votre profil" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-white">
+                                      <SelectItem value="SUPERIEUR_HIERARCHIQUE">Supérieur Hiérarchique</SelectItem>
+                                      <SelectItem value="ENCADREUR">Encadreur</SelectItem>
+                                      <SelectItem value="STAGIAIRE">Stagiaire</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </motion.div>
+
+                                {/* Email avec vérification */}
+                                <motion.div 
+                                  className="space-y-2"
+                                  initial={{ opacity: 0, y: 5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  transition={{ delay: 0.2 }}
+                                >
+                                  <Label htmlFor="register-email" className="text-sm font-semibold flex items-center">
+                                    <Mail className="w-4 h-4 mr-2" />
+                                    Email professionnel
+                                  </Label>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      id="register-email"
+                                      name="email"
+                                      type="email"
+                                      placeholder="votre.email@entreprise.mg"
+                                      value={registerData.email}
+                                      onChange={handleRegisterInputChange}
+                                      required
+                                      className="flex-1 transition-all duration-200 focus:ring-2 focus:ring-blue-500 border h-12 rounded-lg text-sm"
+                                      disabled={isLoading || isVerifying}
+                                    />
+                                    <Button
+                                      type="button"
+                                      onClick={verifyUserExists}
+                                      disabled={!registerData.email || !userType || isVerifying || isLoading}
+                                      className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white h-12 px-4"
                                     >
-                                      <Label htmlFor={field.id} className="text-sm font-semibold flex items-center">
-                                        <field.icon className="w-4 h-4 mr-2" />
-                                        {field.label}
+                                      {isVerifying ? (
+                                        <motion.div
+                                          animate={{ rotate: 360 }}
+                                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                          className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                                        />
+                                      ) : (
+                                        <Search className="w-4 h-4" />
+                                      )}
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Statut de vérification */}
+                                  {renderVerificationStatus()}
+                                </motion.div>
+
+                                {/* Mot de passe et confirmation */}
+                                {verificationStatus === 'success' && (
+                                  <motion.div
+                                    initial={{ opacity: 0, height: 0 }}
+                                    animate={{ opacity: 1, height: 'auto' }}
+                                    className="grid grid-cols-1 xl:grid-cols-2 gap-4"
+                                  >
+                                    <div className="space-y-2">
+                                      <Label htmlFor="register-password" className="text-sm font-semibold flex items-center">
+                                        <Lock className="w-4 h-4 mr-2" />
+                                        Mot de passe
                                       </Label>
-                                      <Input
-                                        id={field.id}
-                                        type={field.type === 'password' ? (showPassword ? "text" : "password") : field.type}
-                                        placeholder={field.placeholder}
-                                        required
-                                        className="transition-all duration-200 focus:ring-2 focus:ring-blue-500 border h-12 rounded-lg text-sm"
-                                        disabled
-                                      />
-                                    </motion.div>
-                                  ))}
-                                </div>
+                                      <div className="relative">
+                                        <Input
+                                          id="register-password"
+                                          name="password"
+                                          type={showPassword ? "text" : "password"}
+                                          placeholder="Mot de passe"
+                                          value={registerData.password}
+                                          onChange={handleRegisterInputChange}
+                                          required
+                                          className="pr-12 transition-all duration-200 focus:ring-2 focus:ring-blue-500 border h-12 rounded-lg text-sm"
+                                          disabled={isLoading}
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 hover:bg-transparent"
+                                          onClick={() => setShowPassword(!showPassword)}
+                                          disabled={isLoading}
+                                        >
+                                          {showPassword ? (
+                                            <EyeOff className="h-4 w-4 text-gray-500" />
+                                          ) : (
+                                            <Eye className="h-4 w-4 text-gray-500" />
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <Label htmlFor="confirm-password" className="text-sm font-semibold flex items-center">
+                                        <Lock className="w-4 h-4 mr-2" />
+                                        Confirmation
+                                      </Label>
+                                      <div className="relative">
+                                        <Input
+                                          id="confirm-password"
+                                          name="confirmPassword"
+                                          type={showConfirmPassword ? "text" : "password"}
+                                          placeholder="Confirmez le mot de passe"
+                                          value={registerData.confirmPassword}
+                                          onChange={handleRegisterInputChange}
+                                          required
+                                          className="pr-12 transition-all duration-200 focus:ring-2 focus:ring-blue-500 border h-12 rounded-lg text-sm"
+                                          disabled={isLoading}
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="absolute right-2 top-1/2 transform -translate-y-1/2 h-8 w-8 hover:bg-transparent"
+                                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                          disabled={isLoading}
+                                        >
+                                          {showConfirmPassword ? (
+                                            <EyeOff className="h-4 w-4 text-gray-500" />
+                                          ) : (
+                                            <Eye className="h-4 w-4 text-gray-500" />
+                                          )}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </motion.div>
+                                )}
 
                                 <motion.div
                                   initial={{ opacity: 0, y: 5 }}
@@ -588,15 +986,23 @@ const Login = () => {
                                   <Button
                                     type="submit"
                                     className="w-full bg-gradient-to-r from-green-600 to-blue-600 hover:from-green-700 hover:to-blue-700 transition-all duration-200 h-12 rounded-lg text-white font-semibold text-sm shadow-md"
-                                    disabled
+                                    disabled={isLoading || verificationStatus !== 'success'}
                                   >
-                                    <motion.span
-                                      whileHover={{ scale: 1.02 }}
-                                      whileTap={{ scale: 0.98 }}
-                                      className="flex items-center justify-center"
-                                    >
-                                      Inscription (bientôt disponible)
-                                    </motion.span>
+                                    {isLoading ? (
+                                      <motion.div
+                                        animate={{ rotate: 360 }}
+                                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                        className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                                      />
+                                    ) : (
+                                      <motion.span
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        className="flex items-center justify-center"
+                                      >
+                                        Créer mon compte
+                                      </motion.span>
+                                    )}
                                   </Button>
                                 </motion.div>
                               </motion.form>

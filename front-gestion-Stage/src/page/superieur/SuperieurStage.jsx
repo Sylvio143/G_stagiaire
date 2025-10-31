@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   BookOpen,
@@ -29,6 +29,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toast, Toaster } from "react-hot-toast";
+import axios from "axios";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -52,137 +54,135 @@ const cardVariants = {
   },
 };
 
-// Données de démonstration pour les stages à valider
-const stagesData = [
-  {
-    id: 1,
-    titre: "Stage Développement Fullstack",
-    entreprise: "TechCorp Solutions",
-    type: "Stage de fin d'études",
-    duree: "6 mois",
-    dateDebut: "2024-09-01",
-    dateFin: "2025-02-28",
-    ville: "Paris",
-    statut: "en_attente",
-    places: 3,
-    placesRestantes: 3,
-    competences: ["React", "Node.js", "MongoDB", "TypeScript"],
-    description: "Développement d'une application web complète avec architecture microservices.",
-    encadreur: "Michel Dubois",
-    dateCreation: "2024-12-08",
-    motif: "",
-    candidatures: 2
-  },
-  {
-    id: 2,
-    titre: "Stage Design UX/UI",
-    entreprise: "CreativeLab Studio",
-    type: "Stage professionnel",
-    duree: "4 mois",
-    dateDebut: "2024-10-15",
-    dateFin: "2025-02-15",
-    ville: "Lyon",
-    statut: "en_attente",
-    places: 2,
-    placesRestantes: 2,
-    competences: ["Figma", "Prototypage", "Recherche Utilisateur", "Design System"],
-    description: "Opportunité unique pour apprendre le design d'expérience utilisateur dans une agence renommée.",
-    encadreur: "Sophie Martin",
-    dateCreation: "2024-12-07",
-    motif: "",
-    candidatures: 0
-  },
-  {
-    id: 3,
-    titre: "Stage Data Science Avancé",
-    entreprise: "DataInnov Analytics",
-    type: "Stage de recherche",
-    duree: "5 mois",
-    dateDebut: "2024-08-20",
-    dateFin: "2025-01-20",
-    ville: "Marseille",
-    statut: "valide",
-    places: 1,
-    placesRestantes: 0,
-    competences: ["Python", "Machine Learning", "Data Visualization", "SQL"],
-    description: "Stage axé sur l'analyse de données et le machine learning pour résoudre des problèmes business complexes.",
-    encadreur: "Pierre Bernard",
-    dateCreation: "2024-12-05",
-    dateValidation: "2024-12-06",
-    motif: "",
-    candidatures: 3
-  },
-  {
-    id: 4,
-    titre: "Stage Marketing Digital",
-    entreprise: "MarketPro Agency",
-    type: "Stage opérationnel",
-    duree: "3 mois",
-    dateDebut: "2024-11-01",
-    dateFin: "2025-01-31",
-    ville: "Toulouse",
-    statut: "refuse",
-    places: 4,
-    placesRestantes: 4,
-    competences: ["SEO", "Réseaux Sociaux", "Analytics", "Content Marketing"],
-    description: "Plongez dans le monde du marketing digital et développez des compétences concrètes en stratégie digitale.",
-    encadreur: "Alice Moreau",
-    dateCreation: "2024-12-04",
-    dateValidation: "2024-12-05",
-    motif: "Durée trop courte pour un stage opérationnel"
-  },
-  {
-    id: 5,
-    titre: "Stage Cybersécurité",
-    entreprise: "SecureIT Systems",
-    type: "Stage opérationnel",
-    duree: "6 mois",
-    dateDebut: "2024-09-01",
-    dateFin: "2025-02-28",
-    ville: "Lille",
-    statut: "en_attente",
-    places: 2,
-    placesRestantes: 2,
-    competences: ["Pentesting", "Sécurité Réseau", "Cryptographie", "Audit"],
-    description: "Audit de sécurité et tests d'intrusion sur l'infrastructure de l'entreprise.",
-    encadreur: "Thomas Leroy",
-    dateCreation: "2024-12-09",
-    motif: "",
-    candidatures: 1
-  }
-];
-
 export default function SuperieurStage() {
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [filtreEncadreur, setFiltreEncadreur] = useState("tous");
   const [recherche, setRecherche] = useState("");
-  const [stages, setStages] = useState(stagesData);
+  const [stages, setStages] = useState([]);
   const [motifRefus, setMotifRefus] = useState("");
   const [stageSelectionne, setStageSelectionne] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [encadreurs, setEncadreurs] = useState([]);
 
-  const getStatutColor = (statut) => {
-    switch (statut) {
-      case 'valide': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
-      case 'refuse': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
-      case 'en_attente': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
+  // Configuration API
+  const API_BASE_URL = "http://localhost:9090/api";
+
+  // Charger les stages sous la supervision du supérieur
+  const fetchStages = async () => {
+    try {
+      setLoading(true);
+      
+      // Récupérer l'ID du supérieur connecté
+      const user = JSON.parse(localStorage.getItem("user"));
+      const superieurId = user?.entityDocumentId;
+      
+      if (!superieurId) {
+        toast.error("Impossible de récupérer les informations du supérieur");
+        return;
+      }
+
+      // Récupérer tous les stages avec relations
+      const response = await axios.get(`${API_BASE_URL}/stages/with-relations`);
+      const tousLesStages = response.data;
+
+      // Filtrer pour ne garder que les stages sous la supervision de ce supérieur
+      const stagesFiltres = tousLesStages.filter(
+        stage => stage.superieurHierarchiqueDocumentId === superieurId
+      );
+
+      // Enrichir les données des stages
+      const stagesEnrichis = await Promise.all(
+        stagesFiltres.map(async (stage) => {
+          try {
+            // Récupérer les détails de l'encadreur
+            let encadreurNom = "Non assigné";
+            if (stage.encadreurDocumentId) {
+              const encadreurResponse = await axios.get(`${API_BASE_URL}/encadreurs/${stage.encadreurDocumentId}`);
+              const encadreur = encadreurResponse.data;
+              encadreurNom = `${encadreur.prenom} ${encadreur.nom}`;
+            }
+
+            // Compter les stagiaires assignés
+            const nombreStagiaires = stage.stagiairesDocumentIds?.length || 0;
+
+            // Compter les tâches
+            let nombreTaches = 0;
+            try {
+              const tachesResponse = await axios.get(`${API_BASE_URL}/taches/stage/${stage.documentId}`);
+              nombreTaches = tachesResponse.data.length;
+            } catch (error) {
+              console.error("Erreur récupération tâches:", error);
+            }
+
+            return {
+              ...stage,
+              encadreurNom,
+              nombreStagiaires,
+              nombreTaches,
+              places: stage.nombreStagiaires || 5, // Valeur par défaut
+              placesRestantes: Math.max(0, (stage.nombreStagiaires || 5) - nombreStagiaires)
+            };
+          } catch (error) {
+            console.error("Erreur enrichissement stage:", error);
+            return {
+              ...stage,
+              encadreurNom: "Erreur chargement",
+              nombreStagiaires: 0,
+              nombreTaches: 0,
+              places: 5,
+              placesRestantes: 5
+            };
+          }
+        })
+      );
+
+      setStages(stagesEnrichis);
+
+      // Extraire la liste des encadreurs uniques
+      const encadreursUniques = [...new Set(stagesEnrichis.map(s => s.encadreurNom).filter(Boolean))];
+      setEncadreurs(encadreursUniques);
+
+    } catch (error) {
+      console.error("Erreur lors du chargement des stages:", error);
+      toast.error("Erreur lors du chargement des stages");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStages();
+  }, []);
+
+  const getStatutColor = (statutStage) => {
+    switch (statutStage) {
+      case 'VALIDE': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800';
+      case 'REFUSE': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800';
+      case 'EN_ATTENTE_VALIDATION': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800';
+      case 'EN_COURS': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-800';
+      case 'TERMINE': return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
       default: return 'bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700';
     }
   };
 
-  const getStatutLabel = (statut) => {
-    switch (statut) {
-      case 'valide': return 'Validé';
-      case 'refuse': return 'Refusé';
-      case 'en_attente': return 'En attente';
-      default: return 'Inconnu';
+  const getStatutLabel = (statutStage) => {
+    switch (statutStage) {
+      case 'VALIDE': return 'Validé';
+      case 'REFUSE': return 'Refusé';
+      case 'EN_ATTENTE_VALIDATION': return 'En attente';
+      case 'EN_COURS': return 'En cours';
+      case 'TERMINE': return 'Terminé';
+      default: return statutStage;
     }
   };
 
-  const getStatutIcon = (statut) => {
-    switch (statut) {
-      case 'valide': return <CheckCircle className="h-4 w-4" />;
-      case 'refuse': return <XCircle className="h-4 w-4" />;
-      case 'en_attente': return <Clock className="h-4 w-4" />;
+  const getStatutIcon = (statutStage) => {
+    switch (statutStage) {
+      case 'VALIDE': return <CheckCircle className="h-4 w-4" />;
+      case 'REFUSE': return <XCircle className="h-4 w-4" />;
+      case 'EN_ATTENTE_VALIDATION': return <Clock className="h-4 w-4" />;
+      case 'EN_COURS': return <AlertCircle className="h-4 w-4" />;
+      case 'TERMINE': return <CheckCircle className="h-4 w-4" />;
       default: return <AlertCircle className="h-4 w-4" />;
     }
   };
@@ -197,50 +197,95 @@ export default function SuperieurStage() {
     }
   };
 
-  // Liste unique des encadreurs
-  const encadreurs = [...new Set(stages.map(s => s.encadreur))];
-
   const stagesFiltres = stages.filter(stage => {
     const correspondRecherche = 
-      stage.titre.toLowerCase().includes(recherche.toLowerCase()) ||
-      stage.entreprise.toLowerCase().includes(recherche.toLowerCase()) ||
-      stage.encadreur.toLowerCase().includes(recherche.toLowerCase());
+      stage.titre?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stage.description?.toLowerCase().includes(recherche.toLowerCase()) ||
+      stage.encadreurNom?.toLowerCase().includes(recherche.toLowerCase());
     
-    const correspondStatut = filtreStatut === "tous" || stage.statut === filtreStatut;
-    const correspondEncadreur = filtreEncadreur === "tous" || stage.encadreur === filtreEncadreur;
+    const correspondStatut = filtreStatut === "tous" || stage.statutStage === filtreStatut;
+    const correspondEncadreur = filtreEncadreur === "tous" || stage.encadreurNom === filtreEncadreur;
     
     return correspondRecherche && correspondStatut && correspondEncadreur;
   });
 
-  const handleValiderStage = (stageId) => {
-    setStages(stages.map(stage => 
-      stage.id === stageId 
-        ? { 
-            ...stage, 
-            statut: 'valide',
-            dateValidation: new Date().toISOString().split('T')[0],
-            motif: ''
-          }
-        : stage
-    ));
+  const handleValiderStage = async (stageId) => {
+    try {
+      const stage = stages.find(s => s.documentId === stageId);
+      if (!stage) {
+        toast.error("Stage non trouvé");
+        return;
+      }
+
+      // Mettre à jour le statut du stage
+      const stageUpdate = {
+        ...stage,
+        statutStage: 'VALIDE'
+      };
+
+      await axios.put(`${API_BASE_URL}/stages/${stageId}`, stageUpdate);
+      
+      toast.success("Stage validé avec succès");
+      await fetchStages(); // Recharger la liste
+    } catch (error) {
+      console.error("Erreur lors de la validation:", error);
+      toast.error("Erreur lors de la validation du stage");
+    }
   };
 
-  const handleRefuserStage = (stageId) => {
+  const handleRefuserStage = async (stageId) => {
     if (!motifRefus.trim()) {
-      alert("Veuillez saisir un motif de refus");
+      toast.error("Veuillez saisir un motif de refus");
       return;
     }
 
-    setStages(stages.map(stage => 
-      stage.id === stageId 
-        ? { 
-            ...stage, 
-            statut: 'refuse',
-            dateValidation: new Date().toISOString().split('T')[0],
-            motif: motifRefus
+    try {
+      const stage = stages.find(s => s.documentId === stageId);
+      if (!stage) {
+        toast.error("Stage non trouvé");
+        return;
+      }
+
+      // Mettre à jour le statut du stage
+      const stageUpdate = {
+        ...stage,
+        statutStage: 'REFUSE'
+        // Note: Vous pourriez vouloir ajouter un champ pour le motif de refus
+      };
+
+      await axios.put(`${API_BASE_URL}/stages/${stageId}`, stageUpdate);
+      
+      // Créer une notification pour l'encadreur
+      if (stage.encadreurDocumentId) {
+        try {
+          // Récupérer le compte utilisateur de l'encadreur
+          const compteResponse = await axios.get(
+            `${API_BASE_URL}/comptes-utilisateurs/entity/${stage.encadreurDocumentId}/type/ENCADREUR`
+          );
+          
+          if (compteResponse.data) {
+            const compteEncadreur = compteResponse.data;
+            
+            await axios.post(`${API_BASE_URL}/notifications/create`, {
+              titre: "Stage refusé",
+              message: `Votre stage "${stage.titre}" a été refusé. Motif: ${motifRefus}`,
+              type: "STAGE_REFUSE",
+              compteUtilisateurDocumentId: compteEncadreur.documentId,
+              documentIdReference: stage.documentId,
+              typeReference: "STAGE"
+            });
           }
-        : stage
-    ));
+        } catch (notifError) {
+          console.error("Erreur création notification:", notifError);
+        }
+      }
+      
+      toast.success("Stage refusé avec succès");
+      await fetchStages(); // Recharger la liste
+    } catch (error) {
+      console.error("Erreur lors du refus:", error);
+      toast.error("Erreur lors du refus du stage");
+    }
     
     setMotifRefus("");
     setStageSelectionne(null);
@@ -248,7 +293,7 @@ export default function SuperieurStage() {
 
   const handleOuvrirModalRefus = (stage) => {
     setStageSelectionne(stage);
-    setMotifRefus(stage.motif || "");
+    setMotifRefus("");
   };
 
   const handleFermerModal = () => {
@@ -258,16 +303,35 @@ export default function SuperieurStage() {
 
   const handleExporterRapport = () => {
     console.log('Export du rapport de validation des stages');
+    toast.success("Export en cours...");
     // Logique d'export
   };
 
+  const handleVoirDetails = (stage) => {
+    console.log('Voir détails stage:', stage);
+    // Navigation vers la page de détails du stage
+  };
+
+  // Calcul des statistiques
   const stats = {
     total: stages.length,
-    enAttente: stages.filter(s => s.statut === 'en_attente').length,
-    valides: stages.filter(s => s.statut === 'valide').length,
-    refuses: stages.filter(s => s.statut === 'refuse').length,
-    totalCandidatures: stages.reduce((acc, stage) => acc + (stage.candidatures || 0), 0)
+    enAttente: stages.filter(s => s.statutStage === 'EN_ATTENTE_VALIDATION').length,
+    valides: stages.filter(s => s.statutStage === 'VALIDE').length,
+    refuses: stages.filter(s => s.statutStage === 'REFUSE').length,
+    enCours: stages.filter(s => s.statutStage === 'EN_COURS').length,
+    totalStagiaires: stages.reduce((acc, stage) => acc + (stage.nombreStagiaires || 0), 0)
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement des stages...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -277,6 +341,21 @@ export default function SuperieurStage() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            fontSize: '14px',
+            fontWeight: '500',
+            borderRadius: '10px',
+            padding: '12px 16px',
+          },
+        }}
+      />
+
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -355,7 +434,7 @@ export default function SuperieurStage() {
             gradient: "from-red-500 to-red-600"
           },
           {
-            title: "Candidatures",
+            title: "Stagiaires Actifs",
             icon: (
               <motion.div
                 animate={{ y: [-8, 0, -8] }}
@@ -364,8 +443,8 @@ export default function SuperieurStage() {
                 <TrendingUp className="h-6 w-6 text-blue-600" />
               </motion.div>
             ),
-            count: stats.totalCandidatures,
-            text: "Total des candidatures",
+            count: stats.totalStagiaires,
+            text: "Total des stagiaires",
             gradient: "from-blue-500 to-blue-600"
           },
         ].map((item, index) => (
@@ -405,7 +484,7 @@ export default function SuperieurStage() {
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
-                    placeholder="Rechercher un stage, entreprise ou encadreur..."
+                    placeholder="Rechercher un stage, description ou encadreur..."
                     value={recherche}
                     onChange={(e) => setRecherche(e.target.value)}
                     className="pl-9 bg-white/50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600"
@@ -420,9 +499,10 @@ export default function SuperieurStage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="tous">Tous les statuts</SelectItem>
-                      <SelectItem value="en_attente">En attente</SelectItem>
-                      <SelectItem value="valide">Validés</SelectItem>
-                      <SelectItem value="refuse">Refusés</SelectItem>
+                      <SelectItem value="EN_ATTENTE_VALIDATION">En attente</SelectItem>
+                      <SelectItem value="VALIDE">Validés</SelectItem>
+                      <SelectItem value="REFUSE">Refusés</SelectItem>
+                      <SelectItem value="EN_COURS">En cours</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -460,7 +540,7 @@ export default function SuperieurStage() {
         <AnimatePresence>
           {stagesFiltres.map((stage) => (
             <motion.div
-              key={stage.id}
+              key={stage.documentId}
               variants={cardVariants}
               layout
               initial={{ opacity: 0, scale: 0.95 }}
@@ -474,20 +554,16 @@ export default function SuperieurStage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-3">
-                        <Badge className={`text-xs ${getStatutColor(stage.statut)} flex items-center gap-1`}>
-                          {getStatutIcon(stage.statut)}
-                          {getStatutLabel(stage.statut)}
-                        </Badge>
-                        <Badge variant="outline" className={`text-xs ${getTypeColor(stage.type)}`}>
-                          {stage.type}
+                        <Badge className={`text-xs ${getStatutColor(stage.statutStage)} flex items-center gap-1`}>
+                          {getStatutIcon(stage.statutStage)}
+                          {getStatutLabel(stage.statutStage)}
                         </Badge>
                       </div>
                       <h3 className="font-semibold text-gray-900 dark:text-white text-lg mb-2">
                         {stage.titre}
                       </h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                        <Building className="h-4 w-4" />
-                        <span className="font-medium">{stage.entreprise}</span>
+                      <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                        {stage.description}
                       </div>
                     </div>
                   </div>
@@ -497,21 +573,16 @@ export default function SuperieurStage() {
                     <div className="flex items-center gap-2">
                       <UserCheck className="h-4 w-4 text-blue-600" />
                       <span className="text-sm font-medium text-gray-900 dark:text-white">
-                        {stage.encadreur}
+                        {stage.encadreurNom}
                       </span>
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      Créé le {new Date(stage.dateCreation).toLocaleDateString()}
+                      Créé le {new Date(stage.createdAt).toLocaleDateString()}
                     </div>
                   </div>
 
                   {/* Informations principales */}
                   <div className="space-y-3 mb-4">
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <Clock className="h-4 w-4" />
-                      <span>{stage.duree}</span>
-                    </div>
-                    
                     <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                       <Calendar className="h-4 w-4" />
                       <span>
@@ -519,65 +590,26 @@ export default function SuperieurStage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                      <MapPin className="h-4 w-4" />
-                      <span>{stage.ville}</span>
-                    </div>
-
-                    {/* Places et candidatures */}
+                    {/* Places et stagiaires */}
                     <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                       <div>
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Places disponibles
+                          Stagiaires assignés
                         </span>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {stage.placesRestantes} / {stage.places} places
+                          {stage.nombreStagiaires} / {stage.places} places
                         </div>
                       </div>
-                      {stage.candidatures !== undefined && (
-                        <div className="text-right">
-                          <div className="text-sm font-bold text-gray-900 dark:text-white">
-                            {stage.candidatures}
-                          </div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            candidature(s)
-                          </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-gray-900 dark:text-white">
+                          {stage.nombreTaches}
                         </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Compétences */}
-                  <div className="mb-4">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Compétences requises</div>
-                    <div className="flex flex-wrap gap-1">
-                      {stage.competences.map((competence, index) => (
-                        <Badge key={index} variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                          {competence}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div className="mb-4">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Description</div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
-                      {stage.description}
-                    </p>
-                  </div>
-
-                  {/* Motif de refus */}
-                  {stage.statut === 'refuse' && stage.motif && (
-                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                      <div className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">
-                        Motif de refus
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          tâche(s)
+                        </div>
                       </div>
-                      <p className="text-sm text-red-700 dark:text-red-300">
-                        {stage.motif}
-                      </p>
                     </div>
-                  )}
+                  </div>
 
                   {/* Actions selon le statut */}
                   <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-gray-700/50">
@@ -585,18 +617,18 @@ export default function SuperieurStage() {
                       variant="outline"
                       size="sm"
                       className="flex-1 gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => console.log('Voir détails:', stage)}
+                      onClick={() => handleVoirDetails(stage)}
                     >
                       <Eye className="h-4 w-4" />
                       Détails
                     </Button>
                     
-                    {stage.statut === 'en_attente' && (
+                    {stage.statutStage === 'EN_ATTENTE_VALIDATION' && (
                       <>
                         <Button
                           size="sm"
                           className="gap-2 bg-emerald-600 hover:bg-emerald-700"
-                          onClick={() => handleValiderStage(stage.id)}
+                          onClick={() => handleValiderStage(stage.documentId)}
                         >
                           <CheckCircle className="h-4 w-4" />
                           Valider
@@ -621,7 +653,7 @@ export default function SuperieurStage() {
       </motion.div>
 
       {/* Message si aucun résultat */}
-      {stagesFiltres.length === 0 && (
+      {stagesFiltres.length === 0 && !loading && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -630,10 +662,13 @@ export default function SuperieurStage() {
         >
           <BookOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
           <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-2">
-            Aucun stage trouvé
+            {stages.length === 0 ? "Aucun stage à valider" : "Aucun stage trouvé"}
           </h3>
           <p className="text-gray-400 dark:text-gray-500">
-            Aucun stage ne correspond à vos critères de recherche.
+            {stages.length === 0 
+              ? "Aucun stage n'est actuellement en attente de votre validation." 
+              : "Aucun stage ne correspond à vos critères de recherche."
+            }
           </p>
         </motion.div>
       )}
@@ -652,7 +687,7 @@ export default function SuperieurStage() {
               Refuser le stage
             </h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-              {stageSelectionne.titre} - {stageSelectionne.encadreur}
+              {stageSelectionne.titre} - {stageSelectionne.encadreurNom}
             </p>
             
             <div className="space-y-3">
@@ -664,6 +699,7 @@ export default function SuperieurStage() {
                 onChange={(e) => setMotifRefus(e.target.value)}
                 placeholder="Saisissez le motif de refus..."
                 className="w-full h-24 p-3 border border-gray-300 dark:border-gray-600 rounded-lg resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                required
               />
               
               <div className="flex gap-2 pt-2">
@@ -675,8 +711,9 @@ export default function SuperieurStage() {
                   Annuler
                 </Button>
                 <Button
-                  onClick={() => handleRefuserStage(stageSelectionne.id)}
+                  onClick={() => handleRefuserStage(stageSelectionne.documentId)}
                   className="flex-1 bg-red-600 hover:bg-red-700"
+                  disabled={!motifRefus.trim()}
                 >
                   Confirmer le refus
                 </Button>
