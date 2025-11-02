@@ -37,6 +37,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { toast, Toaster } from "react-hot-toast";
 import axios from "axios";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -103,6 +104,7 @@ export default function EncadreurNotification() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const navigate = useNavigate();
   const [parametres, setParametres] = useState({
     notificationsEmail: true,
     notificationsPush: true,
@@ -401,10 +403,13 @@ export default function EncadreurNotification() {
     switch (notification.type) {
       case 'NOUVEAU_STAGE':
       case 'STAGE_VALIDE':
+      case 'STAGE_REFUSE':
+        navigate('/encadreur/stage');
         toast.success("Redirection vers les détails du stage");
         break;
       case 'NOUVELLE_TACHE':
       case 'RAPPEL_TACHE':
+        navigate('/encadreur/stage');
         toast.success("Redirection vers les tâches");
         break;
       case 'MESSAGE_IMPORTANT':
@@ -443,14 +448,8 @@ export default function EncadreurNotification() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+    <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -464,7 +463,14 @@ export default function EncadreurNotification() {
           },
         }}
       />
-
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
+      
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -796,100 +802,48 @@ export default function EncadreurNotification() {
           </motion.div>
         </div>
 
-        {/* Paramètres des notifications */}
-        <motion.div
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl sticky top-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                <Settings className="h-5 w-5" />
-                Paramètres des notifications
-              </CardTitle>
-              <CardDescription>
-                Personnalisez vos préférences de notification
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Paramètres avec CustomSwitch */}
-              <div className="space-y-4">
-                <CustomSwitch
-                  id="email-notifications"
-                  checked={parametres.notificationsEmail}
-                  onCheckedChange={(checked) => 
-                    setParametres({...parametres, notificationsEmail: checked})
-                  }
-                  label="Notifications par email"
-                  description="Recevoir les notifications par email"
-                />
-
-                <CustomSwitch
-                  id="push-notifications"
-                  checked={parametres.notificationsPush}
-                  onCheckedChange={(checked) => 
-                    setParametres({...parametres, notificationsPush: checked})
-                  }
-                  label="Notifications push"
-                  description="Notifications en temps réel"
-                />
-
-                <CustomSwitch
-                  id="auto-reminders"
-                  checked={parametres.rappelsAutomatiques}
-                  onCheckedChange={(checked) => 
-                    setParametres({...parametres, rappelsAutomatiques: checked})
-                  }
-                  label="Rappels automatiques"
-                  description="Rappels pour les échéances"
-                />
-
-                <CustomSwitch
-                  id="sounds"
-                  checked={parametres.sons}
-                  onCheckedChange={(checked) => 
-                    setParametres({...parametres, sons: checked})
-                  }
-                  label="Sons de notification"
-                  description="Activer les sons pour les nouvelles notifications"
-                />
-              </div>
-
-              {/* Actions */}
-              <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 border-gray-300 dark:border-gray-600"
-                  onClick={marquerToutCommeLu}
-                  disabled={stats.nonLus === 0 || updating}
-                >
-                  {updating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <CheckCheck className="h-4 w-4" />
-                  )}
-                  Tout marquer comme lu
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 border-red-300 dark:border-red-600 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                  onClick={supprimerToutesNotifications}
-                  disabled={notifications.length === 0 || updating}
-                >
-                  {updating ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="h-4 w-4" />
-                  )}
-                  Supprimer toutes les notifications
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
+        {/* Statut de connexion */}
+<motion.div
+  initial={{ opacity: 0, y: 10 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.4, delay: 0.4 }}
+  className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700"
+>
+  <motion.h4 
+    className="font-semibold text-sm text-gray-900 dark:text-white"
+    whileHover={{ scale: 1.02 }}
+  >
+    🌐 Statut en ligne
+  </motion.h4>
+  <motion.div 
+    className="flex items-center gap-3 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-200 dark:border-emerald-800"
+    whileHover={{ scale: 1.02 }}
+    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+  >
+    <motion.div
+      className="w-3 h-3 bg-emerald-500 rounded-full"
+      animate={{
+        scale: [1, 1.2, 1],
+        opacity: [1, 0.7, 1]
+      }}
+      transition={{
+        duration: 2,
+        repeat: Infinity,
+        ease: "easeInOut"
+      }}
+    />
+    <div className="flex-1">
+      <p className="text-sm font-medium text-emerald-900 dark:text-emerald-100">
+        Connecté
+      </p>
+      <p className="text-xs text-emerald-700 dark:text-emerald-300">
+        Recevez les notifications en temps réel
+      </p>
+    </div>
+  </motion.div>
+</motion.div>
       </div>
     </motion.div>
+    </>
   );
 }

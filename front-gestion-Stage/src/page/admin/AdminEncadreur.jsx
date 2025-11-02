@@ -80,6 +80,8 @@ export default function AdminEncadreur() {
   const [filtreSuperieur, setFiltreSuperieur] = useState("tous");
   const [recherche, setRecherche] = useState("");
   const [openDialog, setOpenDialog] = useState(false);
+const [pageActuelle, setPageActuelle] = useState(1);
+const [elementsParPage, setElementsParPage] = useState(10);
   const [selectedEncadreur, setSelectedEncadreur] = useState(null);
   const [formData, setFormData] = useState({
     nom: "",
@@ -126,6 +128,35 @@ export default function AdminEncadreur() {
     fetchEncadreurs();
     fetchSuperieurs();
   }, []);
+  // Ajoutez ces fonctions dans votre composant, après les useState
+const validateCIN = (cin) => {
+  const cleanCIN = cin.replace(/\s+/g, '');
+  
+  // Vérification basique
+  if (cleanCIN.length !== 12) return false;
+  if (!/^\d+$/.test(cleanCIN)) return false;
+  
+  const district = cleanCIN.substring(0, 3);
+  const partieCentrale = cleanCIN.substring(3, 6);
+  
+  const districtsValides = ['201', '101', '301', '401', '501', '601'];
+  if (!districtsValides.includes(district)) return false;
+  if (partieCentrale !== '010' && partieCentrale !== '011') return false;
+  
+  return true;
+};
+
+const validateTelephone = (telephone) => {
+  const cleanPhone = telephone.replace(/\s+/g, '');
+  
+  if (cleanPhone.length !== 10) return false;
+  if (!/^\d+$/.test(cleanPhone)) return false;
+  
+  const prefixesValides = ['033', '032', '034', '038', '037'];
+  const prefix = cleanPhone.substring(0, 3);
+  
+  return prefixesValides.includes(prefix);
+};
 
   // Vérifier si l'email existe déjà
   const checkEmailExists = (email, currentDocumentId = null) => {
@@ -195,6 +226,19 @@ export default function AdminEncadreur() {
         toast.error("Veuillez remplir tous les champs obligatoires");
         return;
       }
+
+      // Validation CIN - SIMPLE
+    if (!validateCIN(formData.cin)) {
+      toast.error("CIN invalide : doit avoir 12 chiffres, commencer par 201/101/301/401/501/601, suivi de 010 ou 011");
+      return;
+    }
+
+    // Validation téléphone - SIMPLE
+    if (!validateTelephone(formData.telephone)) {
+      toast.error("Téléphone invalide : 10 chiffres commençant par 033, 032, 034, 038 ou 037");
+      return;
+    }
+
 
       let response;
       const superieurId = formData.superieurHierarchiqueDocumentId === "aucun" ? null : formData.superieurHierarchiqueDocumentId;
@@ -362,15 +406,26 @@ export default function AdminEncadreur() {
     );
   }
 
+  // Ajoutez après vos autres fonctions, avant le return
+// Calcul des données paginées
+const indexDernierElement = pageActuelle * elementsParPage;
+const indexPremierElement = indexDernierElement - elementsParPage;
+const encadreursPagination = encadreursFiltres.slice(indexPremierElement, indexDernierElement);
+const totalPages = Math.ceil(encadreursFiltres.length / elementsParPage);
+
+// Fonction pour changer de page
+const changerPage = (page) => {
+  setPageActuelle(page);
+};
+
+// Fonction pour le sélecteur d'éléments par page
+const handleElementsParPageChange = (value) => {
+  setElementsParPage(Number(value));
+  setPageActuelle(1); // Retour à la première page
+};
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+    <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -384,7 +439,13 @@ export default function AdminEncadreur() {
           },
         }}
       />
-
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -402,14 +463,6 @@ export default function AdminEncadreur() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button 
-              onClick={handleExport}
-              variant="outline"
-              className="gap-2 border-gray-300 dark:border-gray-600"
-            >
-              <Download className="h-4 w-4" />
-              Exporter
-            </Button>
             <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
                 <Button 
@@ -709,8 +762,8 @@ export default function AdminEncadreur() {
               </div>
 
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                {encadreursFiltres.length} encadreur(s) trouvé(s)
-              </div>
+  {encadreursFiltres.length} encadreur(s) trouvé(s) • Page {pageActuelle}/{totalPages}
+</div>
             </div>
           </CardContent>
         </Card>
@@ -743,7 +796,7 @@ export default function AdminEncadreur() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {encadreursFiltres.map((encadreur) => (
+                {encadreursPagination.map((encadreur) => (
                   <TableRow key={encadreur.documentId}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -823,14 +876,6 @@ export default function AdminEncadreur() {
                           <Edit2 className="h-4 w-4" />
                         </Button>
                         
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(encadreur)}
-                          title="Voir détails"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
 
                         <Button
                           variant="outline"
@@ -847,7 +892,90 @@ export default function AdminEncadreur() {
                 ))}
               </TableBody>
             </Table>
+            {/* Pagination - À ajouter après la Table */}
+{encadreursFiltres.length > 0 && (
+  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 border-t border-gray-200 dark:border-gray-700">
+    {/* Sélecteur d'éléments par page */}
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-gray-600 dark:text-gray-400">Afficher</span>
+      <Select value={elementsParPage.toString()} onValueChange={handleElementsParPageChange}>
+        <SelectTrigger className="w-20 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="5">5</SelectItem>
+          <SelectItem value="10">10</SelectItem>
+          <SelectItem value="20">20</SelectItem>
+          <SelectItem value="50">50</SelectItem>
+        </SelectContent>
+      </Select>
+      <span className="text-sm text-gray-600 dark:text-gray-400">éléments par page</span>
+    </div>
 
+    {/* Informations de pagination */}
+    <div className="text-sm text-gray-600 dark:text-gray-400">
+      Affichage de {indexPremierElement + 1} à {Math.min(indexDernierElement, encadreursFiltres.length)} sur {encadreursFiltres.length} encadreurs
+    </div>
+
+    {/* Contrôles de pagination */}
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => changerPage(pageActuelle - 1)}
+        disabled={pageActuelle === 1}
+        className="border-gray-300 dark:border-gray-600"
+      >
+        Précédent
+      </Button>
+
+      {/* Numéros de page */}
+      <div className="flex gap-1">
+        {[...Array(totalPages)].map((_, index) => {
+          const pageNum = index + 1;
+          // Afficher seulement les pages proches de la page actuelle
+          if (
+            pageNum === 1 ||
+            pageNum === totalPages ||
+            (pageNum >= pageActuelle - 1 && pageNum <= pageActuelle + 1)
+          ) {
+            return (
+              <Button
+                key={pageNum}
+                variant={pageActuelle === pageNum ? "default" : "outline"}
+                size="sm"
+                onClick={() => changerPage(pageNum)}
+                className={`min-w-10 ${
+                  pageActuelle === pageNum 
+                    ? "bg-blue-600 text-white" 
+                    : "border-gray-300 dark:border-gray-600"
+                }`}
+              >
+                {pageNum}
+              </Button>
+            );
+          } else if (
+            pageNum === pageActuelle - 2 ||
+            pageNum === pageActuelle + 2
+          ) {
+            return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+          }
+          return null;
+        })}
+      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => changerPage(pageActuelle + 1)}
+        disabled={pageActuelle === totalPages}
+        className="border-gray-300 dark:border-gray-600"
+      >
+        Suivant
+      </Button>
+    </div>
+  </div>
+)}
             {/* Message si aucun résultat */}
             {encadreursFiltres.length === 0 && (
               <div className="text-center py-12">
@@ -864,5 +992,6 @@ export default function AdminEncadreur() {
         </Card>
       </motion.div>
     </motion.div>
+    </>
   );
 }

@@ -293,14 +293,8 @@ export default function SuperieurStagiaire() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+    <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -315,6 +309,14 @@ export default function SuperieurStagiaire() {
         }}
       />
 
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
+      
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -331,14 +333,6 @@ export default function SuperieurStagiaire() {
               Supervision de l'ensemble des stagiaires encadrés par votre équipe
             </p>
           </div>
-          <Button 
-            onClick={handleExporterListe}
-            variant="outline"
-            className="gap-2 border-gray-300 dark:border-gray-600"
-          >
-            <Download className="h-4 w-4" />
-            Exporter
-          </Button>
         </div>
       </motion.div>
 
@@ -586,26 +580,6 @@ export default function SuperieurStagiaire() {
                   </div>
                 </div>
 
-                {/* Barre de progression du stage */}
-                {stagiaire.hasActiveStage && (
-                  <div className="px-6 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progression du stage</span>
-                      <span className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        {stagiaire.progression}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <motion.div
-                        className={`h-2 rounded-full ${getProgressionColor(stagiaire.progression)}`}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${stagiaire.progression}%` }}
-                        transition={{ duration: 1, delay: 0.2 }}
-                      />
-                    </div>
-                  </div>
-                )}
-
                 {/* Niveau d'étude */}
                 {stagiaire.niveauEtude && (
                   <div className="px-6 pb-4">
@@ -619,15 +593,6 @@ export default function SuperieurStagiaire() {
                 {/* Actions */}
                 <div className="p-6 pt-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-700/30">
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => handleVoirDetails(stagiaire)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Voir
-                    </Button>
                     
                     <Button
                       variant="outline"
@@ -681,5 +646,6 @@ export default function SuperieurStagiaire() {
         </motion.div>
       )}
     </motion.div>
+    </>
   );
 }

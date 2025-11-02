@@ -256,11 +256,6 @@ export default function EncadreurSidebar({
       path: "/encadreur/stage" 
     },
     { 
-      label: "Rapports", 
-      icon: <FileText className="w-5 h-5" />, 
-      path: "/encadreur/rapports" 
-    },
-    { 
       label: "Notifications", 
       icon: (
         <div className="relative">

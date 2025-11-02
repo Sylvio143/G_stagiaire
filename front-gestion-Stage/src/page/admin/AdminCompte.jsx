@@ -90,7 +90,9 @@ export default function AdminCompte() {
     entityDocumentId: "",
     entityType: ""
   });
-
+  // Ajoutez après vos autres useState
+const [pageActuelle, setPageActuelle] = useState(1);
+const [elementsParPage, setElementsParPage] = useState(10);
   // Configuration Axios
   const API_BASE_URL = "http://localhost:9090/api";
 
@@ -288,16 +290,26 @@ export default function AdminCompte() {
       </div>
     );
   }
+  
+// Calcul des données paginées
+const indexDernierElement = pageActuelle * elementsParPage;
+const indexPremierElement = indexDernierElement - elementsParPage;
+const comptesPagination = comptesFiltres.slice(indexPremierElement, indexDernierElement);
+const totalPages = Math.ceil(comptesFiltres.length / elementsParPage);
 
+// Fonction pour changer de page
+const changerPage = (page) => {
+  setPageActuelle(page);
+};
+
+// Fonction pour le sélecteur d'éléments par page
+const handleElementsParPageChange = (value) => {
+  setElementsParPage(Number(value));
+  setPageActuelle(1); // Retour à la première page
+};
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+    <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -312,6 +324,14 @@ export default function AdminCompte() {
         }}
       />
 
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
+      
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -328,14 +348,6 @@ export default function AdminCompte() {
               Administration des comptes Superieurs, Encadreurs, Stagiaires et Administrateurs
             </p>
           </div>
-          <Button 
-            onClick={handleExport}
-            variant="outline"
-            className="gap-2 border-gray-300 dark:border-gray-600"
-          >
-            <Download className="h-4 w-4" />
-            Exporter
-          </Button>
         </div>
       </motion.div>
 
@@ -452,8 +464,8 @@ export default function AdminCompte() {
               </div>
 
               <div className="text-sm text-gray-500 dark:text-gray-400">
-                {comptesFiltres.length} compte(s) trouvé(s)
-              </div>
+  {comptesFiltres.length} encadreur(s) trouvé(s) • Page {pageActuelle}/{totalPages}
+</div>
             </div>
           </CardContent>
         </Card>
@@ -484,7 +496,7 @@ export default function AdminCompte() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {comptesFiltres.map((compte) => (
+                {comptesPagination.map((compte) => (
                   <TableRow key={compte.documentId}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -578,24 +590,6 @@ export default function AdminCompte() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleOpenDialog(compte)}
-                          title="Modifier"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(compte)}
-                          title="Voir détails"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
-                        <Button
-                          variant="outline"
-                          size="sm"
                           onClick={() => handleDeleteCompte(compte.documentId)}
                           title="Supprimer"
                           className="text-red-600 hover:text-red-700"
@@ -608,6 +602,90 @@ export default function AdminCompte() {
                 ))}
               </TableBody>
             </Table>
+            {/* Pagination - À ajouter après la Table */}
+{comptesFiltres.length > 0 && (
+  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 border-t border-gray-200 dark:border-gray-700">
+    {/* Sélecteur d'éléments par page */}
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-gray-600 dark:text-gray-400">Afficher</span>
+      <Select value={elementsParPage.toString()} onValueChange={handleElementsParPageChange}>
+        <SelectTrigger className="w-20 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="4">4</SelectItem>
+          <SelectItem value="10">10</SelectItem>
+          <SelectItem value="20">20</SelectItem>
+          <SelectItem value="50">50</SelectItem>
+        </SelectContent>
+      </Select>
+      <span className="text-sm text-gray-600 dark:text-gray-400">éléments par page</span>
+    </div>
+
+    {/* Informations de pagination */}
+    <div className="text-sm text-gray-600 dark:text-gray-400">
+      Affichage de {indexPremierElement + 1} à {Math.min(indexDernierElement, comptesFiltres.length)} sur {comptesFiltres.length} comptes
+    </div>
+
+    {/* Contrôles de pagination */}
+    <div className="flex items-center gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => changerPage(pageActuelle - 1)}
+        disabled={pageActuelle === 1}
+        className="border-gray-300 dark:border-gray-600"
+      >
+        Précédent
+      </Button>
+
+      {/* Numéros de page */}
+      <div className="flex gap-1">
+        {[...Array(totalPages)].map((_, index) => {
+          const pageNum = index + 1;
+          // Afficher seulement les pages proches de la page actuelle
+          if (
+            pageNum === 1 ||
+            pageNum === totalPages ||
+            (pageNum >= pageActuelle - 1 && pageNum <= pageActuelle + 1)
+          ) {
+            return (
+              <Button
+                key={pageNum}
+                variant={pageActuelle === pageNum ? "default" : "outline"}
+                size="sm"
+                onClick={() => changerPage(pageNum)}
+                className={`min-w-10 ${
+                  pageActuelle === pageNum 
+                    ? "bg-blue-600 text-white" 
+                    : "border-gray-300 dark:border-gray-600"
+                }`}
+              >
+                {pageNum}
+              </Button>
+            );
+          } else if (
+            pageNum === pageActuelle - 2 ||
+            pageNum === pageActuelle + 2
+          ) {
+            return <span key={pageNum} className="px-2 text-gray-500">...</span>;
+          }
+          return null;
+        })}
+      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => changerPage(pageActuelle + 1)}
+        disabled={pageActuelle === totalPages}
+        className="border-gray-300 dark:border-gray-600"
+      >
+        Suivant
+      </Button>
+    </div>
+  </div>
+)}
 
             {/* Message si aucun résultat */}
             {comptesFiltres.length === 0 && (
@@ -727,5 +805,6 @@ export default function AdminCompte() {
         </DialogContent>
       </Dialog>
     </motion.div>
+    </>
   );
 }

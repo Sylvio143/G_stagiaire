@@ -103,19 +103,43 @@ export default function AdminStagiaire() {
   // Configuration Axios
   const API_BASE_URL = "http://localhost:9090/api";
 
-  // Charger les stagiaires depuis l'API
-  const fetchStagiaires = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`${API_BASE_URL}/stagiaires/tous`);
-      setStagiaires(response.data);
-    } catch (error) {
-      console.error("Erreur lors du chargement des stagiaires:", error);
-      toast.error("Erreur lors du chargement des stagiaires");
-    } finally {
-      setLoading(false);
-    }
-  };
+ // Modifiez la fonction fetchStagiaires dans AdminStagiaire
+const fetchStagiaires = async () => {
+  try {
+    setLoading(true);
+    const response = await axios.get(`${API_BASE_URL}/stagiaires/tous`);
+    
+    // Pour chaque stagiaire, récupérer les informations de stage
+    const stagiairesAvecStages = await Promise.all(
+      response.data.map(async (stagiaire) => {
+        try {
+          const stagesResponse = await axios.get(`${API_BASE_URL}/stages/stagiaire/${stagiaire.documentId}`);
+          const stagesActifs = stagesResponse.data.filter(stage => 
+            stage.statutStage === 'EN_COURS' || stage.statutStage === 'EN_ATTENTE_VALIDATION'
+          );
+          
+          return {
+            ...stagiaire,
+            hasActiveStage: stagesActifs.length > 0
+          };
+        } catch (error) {
+          console.error(`Erreur lors du chargement du stage pour ${stagiaire.prenom} ${stagiaire.nom}:`, error);
+          return {
+            ...stagiaire,
+            hasActiveStage: false
+          };
+        }
+      })
+    );
+
+    setStagiaires(stagiairesAvecStages);
+  } catch (error) {
+    console.error("Erreur lors du chargement des stagiaires:", error);
+    toast.error("Erreur lors du chargement des stagiaires");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // Charger les encadreurs depuis l'API
   const fetchEncadreurs = async () => {
@@ -197,6 +221,35 @@ export default function AdminStagiaire() {
     }
     setOpenDialog(true);
   };
+  // Ajoutez ces fonctions dans votre composant, après les useState
+const validateCIN = (cin) => {
+  const cleanCIN = cin.replace(/\s+/g, '');
+  
+  // Vérification basique
+  if (cleanCIN.length !== 12) return false;
+  if (!/^\d+$/.test(cleanCIN)) return false;
+  
+  const district = cleanCIN.substring(0, 3);
+  const partieCentrale = cleanCIN.substring(3, 6);
+  
+  const districtsValides = ['201', '101', '301', '401', '501', '601'];
+  if (!districtsValides.includes(district)) return false;
+  if (partieCentrale !== '010' && partieCentrale !== '011') return false;
+  
+  return true;
+};
+
+const validateTelephone = (telephone) => {
+  const cleanPhone = telephone.replace(/\s+/g, '');
+  
+  if (cleanPhone.length !== 10) return false;
+  if (!/^\d+$/.test(cleanPhone)) return false;
+  
+  const prefixesValides = ['033', '032', '034', '038', '037'];
+  const prefix = cleanPhone.substring(0, 3);
+  
+  return prefixesValides.includes(prefix);
+};
 
   const handleSaveStagiaire = async () => {
     try {
@@ -205,6 +258,17 @@ export default function AdminStagiaire() {
         toast.error("Veuillez remplir tous les champs obligatoires");
         return;
       }
+      // Validation CIN - SIMPLE
+    if (!validateCIN(formData.cin)) {
+      toast.error("CIN invalide : doit avoir 12 chiffres, commencer par 201/101/301/401/501/601, suivi de 010 ou 011");
+      return;
+    }
+
+    // Validation téléphone - SIMPLE
+    if (!validateTelephone(formData.telephone)) {
+      toast.error("Téléphone invalide : 10 chiffres commençant par 033, 032, 034, 038 ou 037");
+      return;
+    }
 
       let response;
       const encadreurId = formData.encadreurDocumentId === "aucun" ? null : formData.encadreurDocumentId;
@@ -269,6 +333,7 @@ export default function AdminStagiaire() {
     }
   };
 
+  
   // Supprimer un stagiaire
   const handleDeleteStagiaire = async (documentId) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce stagiaire ?")) {
@@ -378,14 +443,8 @@ export default function AdminStagiaire() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+    <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -399,7 +458,14 @@ export default function AdminStagiaire() {
           },
         }}
       />
-
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
+      
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -417,14 +483,6 @@ export default function AdminStagiaire() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button 
-              onClick={handleExport}
-              variant="outline"
-              className="gap-2 border-gray-300 dark:border-gray-600"
-            >
-              <Download className="h-4 w-4" />
-              Exporter
-            </Button>
             <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
                 <Button 
@@ -882,16 +940,7 @@ export default function AdminStagiaire() {
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(stagiaire)}
-                          title="Voir détails"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-
+    
                         <Button
                           variant="outline"
                           size="sm"
@@ -924,5 +973,6 @@ export default function AdminStagiaire() {
         </Card>
       </motion.div>
     </motion.div>
+    </>
   );
 }

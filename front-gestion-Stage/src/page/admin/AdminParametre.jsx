@@ -165,31 +165,55 @@ export default function AdminParametre() {
   const handleChangerMotPasse = async () => {
     try {
       if (!admin) return;
-
+  
       if (changementMotPasse.nouveau !== changementMotPasse.confirmation) {
         toast.error("Les mots de passe ne correspondent pas");
         return;
       }
-
+  
       if (changementMotPasse.nouveau.length < 6) {
         toast.error("Le mot de passe doit contenir au moins 6 caractères");
         return;
       }
-
-      // Utiliser l'endpoint de changement de mot de passe des comptes
-      await axios.put(`${API_BASE_URL}/comptes-utilisateurs/${admin.documentId}/password`, {
+  
+      // Essayer directement avec l'email de l'admin
+      const compteResponse = await axios.get(`${API_BASE_URL}/comptes-utilisateurs/email/${admin.email}`);
+      
+      if (!compteResponse.data) {
+        toast.error("Compte utilisateur non trouvé");
+        return;
+      }
+  
+      const compteUtilisateur = compteResponse.data;
+  
+      // Vérifier que le documentId existe
+      if (!compteUtilisateur.documentId) {
+        toast.error("DocumentId du compte utilisateur manquant");
+        return;
+      }
+  
+      console.log("Changement de mot de passe pour le compte:", compteUtilisateur.documentId);
+  
+      await axios.put(`${API_BASE_URL}/comptes-utilisateurs/${compteUtilisateur.documentId}/password`, {
         newPassword: changementMotPasse.nouveau
       });
-
+  
       toast.success("Mot de passe modifié avec succès");
       setChangementMotPasse({
         actuel: "",
         nouveau: "",
         confirmation: ""
       });
+  
     } catch (error) {
-      console.error("Erreur lors du changement de mot de passe:", error);
-      toast.error("Erreur lors du changement de mot de passe");
+      console.error("Erreur complète:", error);
+      console.error("Données de l'erreur:", error.response?.data);
+      
+      if (error.response?.status === 404) {
+        toast.error("Compte utilisateur non trouvé. Vérifiez que le compte existe.");
+      } else {
+        toast.error(`Erreur: ${error.response?.data?.message || error.message}`);
+      }
     }
   };
 
@@ -247,14 +271,8 @@ export default function AdminParametre() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+    <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -268,6 +286,14 @@ export default function AdminParametre() {
           },
         }}
       />
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
+      
 
       {/* Header */}
       <motion.div 
@@ -325,17 +351,9 @@ export default function AdminParametre() {
             <User className="h-4 w-4 mr-2" />
             Profil
           </TabsTrigger>
-          <TabsTrigger value="notifications" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow">
-            <Bell className="h-4 w-4 mr-2" />
-            Notifications
-          </TabsTrigger>
           <TabsTrigger value="securite" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow">
             <Shield className="h-4 w-4 mr-2" />
             Sécurité
-          </TabsTrigger>
-          <TabsTrigger value="avance" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow">
-            <Settings className="h-4 w-4 mr-2" />
-            Avancé
           </TabsTrigger>
         </TabsList>
 
@@ -521,62 +539,6 @@ export default function AdminParametre() {
           </motion.div>
         </TabsContent>
 
-        {/* Onglet Notifications */}
-        <TabsContent value="notifications">
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="grid gap-6"
-          >
-            <motion.div variants={cardVariants}>
-              <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                    <Bell className="h-5 w-5" />
-                    Préférences de Notification
-                  </CardTitle>
-                  <CardDescription>
-                    Contrôlez comment et quand vous recevez les notifications
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <CustomSwitch
-                    id="notifications-email"
-                    checked={true}
-                    onCheckedChange={() => {}}
-                    label="Notifications par email"
-                    description="Recevoir les notifications importantes par email"
-                  />
-
-                  <CustomSwitch
-                    id="notifications-push"
-                    checked={true}
-                    onCheckedChange={() => {}}
-                    label="Notifications push"
-                    description="Notifications en temps réel sur la plateforme"
-                  />
-
-                  <CustomSwitch
-                    id="notifications-rappels"
-                    checked={true}
-                    onCheckedChange={() => {}}
-                    label="Rappels automatiques"
-                    description="Rappels pour les échéances importantes"
-                  />
-
-                  <CustomSwitch
-                    id="notifications-nouveautes"
-                    checked={false}
-                    onCheckedChange={() => {}}
-                    label="Nouvelles fonctionnalités"
-                    description="Être informé des nouvelles fonctionnalités"
-                  />
-                </CardContent>
-              </Card>
-            </motion.div>
-          </motion.div>
-        </TabsContent>
 
         {/* Onglet Sécurité */}
         <TabsContent value="securite">
@@ -725,74 +687,8 @@ export default function AdminParametre() {
           </motion.div>
         </TabsContent>
 
-        {/* Onglet Avancé */}
-        <TabsContent value="avance">
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="grid gap-6"
-          >
-            {/* Export des données */}
-            <motion.div variants={cardVariants}>
-              <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-white/20 dark:border-gray-700/50 shadow-xl rounded-2xl overflow-hidden">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-                    <Download className="h-5 w-5" />
-                    Export des Données
-                  </CardTitle>
-                  <CardDescription>
-                    Téléchargez une copie de vos données personnelles
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Vous pouvez demander l'export de toutes vos données personnelles stockées sur notre plateforme.
-                  </p>
-                  <Button
-                    onClick={handleExportDonnees}
-                    variant="outline"
-                    className="gap-2 border-gray-300 dark:border-gray-600"
-                  >
-                    <Download className="h-4 w-4" />
-                    Exporter mes données
-                  </Button>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Suppression du compte */}
-            <motion.div variants={cardVariants}>
-              <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-red-200 dark:border-red-800 shadow-xl rounded-2xl overflow-hidden">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                    <Trash2 className="h-5 w-5" />
-                    Zone Dangereuse
-                  </CardTitle>
-                  <CardDescription className="text-red-600 dark:text-red-400">
-                    Actions irréversibles - Soyez certain de vos choix
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      La suppression de votre compte est définitive. Toutes vos données seront supprimées de manière irréversible.
-                    </p>
-                    <Button
-                      onClick={handleSupprimerCompte}
-                      variant="outline"
-                      className="gap-2 border-red-300 dark:border-red-600 text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Supprimer mon compte
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </motion.div>
-        </TabsContent>
       </Tabs>
     </motion.div>
+    </>
   );
 }

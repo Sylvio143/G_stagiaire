@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
+import {
   Plus,
-  Users, 
+  Users,
   Calendar,
   Building,
   MapPin,
@@ -20,7 +20,11 @@ import {
   XCircle,
   AlertCircle,
   ListTodo,
-  Bell
+  Bell,
+  UserCheck,
+  UserX,
+  Mail,
+  Phone
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -44,6 +48,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { toast, Toaster } from "react-hot-toast";
 import axios from "axios";
 
@@ -73,9 +78,11 @@ export default function EncadreurStage() {
   const [filtreStatut, setFiltreStatut] = useState("tous");
   const [recherche, setRecherche] = useState("");
   const [stages, setStages] = useState([]);
+  const [stagiaires, setStagiaires] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isTacheDialogOpen, setIsTacheDialogOpen] = useState(false);
+  const [isTerminerDialogOpen, setIsTerminerDialogOpen] = useState(false);
   const [stageSelectionne, setStageSelectionne] = useState(null);
   const [nouveauStage, setNouveauStage] = useState({
     titre: "",
@@ -101,11 +108,11 @@ export default function EncadreurStage() {
   const fetchStages = async () => {
     try {
       setLoading(true);
-      
+
       // Récupérer l'ID de l'encadreur connecté
       const user = JSON.parse(localStorage.getItem("user"));
       const encadreurId = user?.entityDocumentId;
-      
+
       if (!encadreurId) {
         toast.error("Impossible de récupérer les informations de l'encadreur");
         return;
@@ -169,44 +176,60 @@ export default function EncadreurStage() {
     }
   };
 
+  // Charger les stagiaires pour les notifications
+  const fetchStagiaires = async () => {
+    try {
+      const user = JSON.parse(localStorage.getItem("user"));
+      const encadreurId = user?.entityDocumentId;
+
+      if (encadreurId) {
+        const response = await axios.get(`${API_BASE_URL}/stagiaires/encadreur/${encadreurId}`);
+        setStagiaires(response.data);
+      }
+    } catch (error) {
+      console.error("Erreur chargement stagiaires:", error);
+    }
+  };
+
   useEffect(() => {
     fetchStages();
+    fetchStagiaires();
   }, []);
 
   // Validation du formulaire stage
   const validateForm = () => {
     const errors = {};
-    
+
     if (!nouveauStage.titre?.trim()) {
       errors.titre = "Le titre est obligatoire";
     } else if (nouveauStage.titre.length < 5) {
       errors.titre = "Le titre doit contenir au moins 5 caractères";
     }
-    
+
     if (!nouveauStage.description?.trim()) {
       errors.description = "La description est obligatoire";
     } else if (nouveauStage.description.length < 20) {
       errors.description = "La description doit contenir au moins 20 caractères";
     }
-    
+
     if (!nouveauStage.dateDebut) {
       errors.dateDebut = "La date de début est obligatoire";
     } else if (new Date(nouveauStage.dateDebut) < new Date()) {
       errors.dateDebut = "La date de début ne peut pas être dans le passé";
     }
-    
+
     if (!nouveauStage.dateFin) {
       errors.dateFin = "La date de fin est obligatoire";
     } else if (new Date(nouveauStage.dateFin) <= new Date(nouveauStage.dateDebut)) {
       errors.dateFin = "La date de fin doit être après la date de début";
     }
-    
+
     if (!nouveauStage.places || nouveauStage.places < 1) {
       errors.places = "Le nombre de places doit être d'au moins 1";
     } else if (nouveauStage.places > 10) {
       errors.places = "Le nombre de places ne peut pas dépasser 10";
     }
-    
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -214,43 +237,159 @@ export default function EncadreurStage() {
   // Validation du formulaire tâche
   const validateTacheForm = () => {
     const errors = {};
-    
+
     if (!nouvelleTache.titre?.trim()) {
       errors.titre = "Le titre est obligatoire";
     }
-    
+
     if (!nouvelleTache.description?.trim()) {
       errors.description = "La description est obligatoire";
     }
-    
+
     if (!nouvelleTache.dateDebut) {
       errors.dateDebut = "La date de début est obligatoire";
     }
-    
+
     if (!nouvelleTache.dateFin) {
       errors.dateFin = "La date de fin est obligatoire";
     } else if (new Date(nouvelleTache.dateFin) <= new Date(nouvelleTache.dateDebut)) {
       errors.dateFin = "La date de fin doit être après la date de début";
     }
-    
+
     // Vérifier que les dates de la tâche sont dans la période du stage
     if (stageSelectionne) {
       const dateDebutStage = new Date(stageSelectionne.dateDebut);
       const dateFinStage = new Date(stageSelectionne.dateFin);
       const dateDebutTache = new Date(nouvelleTache.dateDebut);
       const dateFinTache = new Date(nouvelleTache.dateFin);
-      
+
       if (dateDebutTache < dateDebutStage) {
         errors.dateDebut = `La tâche ne peut pas commencer avant le stage (${dateDebutStage.toLocaleDateString()})`;
       }
-      
+
       if (dateFinTache > dateFinStage) {
         errors.dateFin = `La tâche ne peut pas se terminer après le stage (${dateFinStage.toLocaleDateString()})`;
       }
     }
-    
+
     setValidationTacheErrors(errors);
     return Object.keys(errors).length === 0;
+  };
+
+  // Fonction pour terminer un stage
+  const handleTerminerStage = async () => {
+    try {
+      if (!stageSelectionne) return;
+
+      const aujourdhui = new Date();
+      const dateFinStage = new Date(stageSelectionne.dateFin);
+
+      // Vérifier que la date actuelle n'est pas avant la date de fin du stage
+      if (aujourdhui < dateFinStage) {
+        toast.error("Impossible de terminer le stage avant sa date de fin prévue");
+        return;
+      }
+
+      // Mettre à jour le statut du stage
+      await axios.put(`${API_BASE_URL}/stages/${stageSelectionne.documentId}`, {
+        ...stageSelectionne,
+        statutStage: 'TERMINE'
+      });
+
+      // Créer des notifications pour tous les stagiaires du stage
+      if (stageSelectionne.stagiairesDocumentIds && stageSelectionne.stagiairesDocumentIds.length > 0) {
+        try {
+          for (const stagiaireId of stageSelectionne.stagiairesDocumentIds) {
+            // Récupérer le compte utilisateur du stagiaire
+            const compteResponse = await axios.get(
+              `${API_BASE_URL}/comptes-utilisateurs/entity/${stagiaireId}/type/STAGIAIRE`
+            );
+
+            if (compteResponse.data) {
+              const compteStagiaire = compteResponse.data;
+
+              await axios.post(`${API_BASE_URL}/notifications/create`, {
+                titre: "Stage terminé",
+                message: `Votre stage "${stageSelectionne.titre}" a été marqué comme terminé par votre encadreur.`,
+                type: "STAGE_TERMINE",
+                compteUtilisateurDocumentId: compteStagiaire.documentId,
+                documentIdReference: stageSelectionne.documentId,
+                typeReference: "STAGE"
+              });
+            }
+          }
+        } catch (notifError) {
+          console.error("Erreur création notifications stagiaires:", notifError);
+        }
+      }
+
+      // Créer une notification pour le supérieur hiérarchique
+      try {
+        if (stageSelectionne.superieurHierarchiqueDocumentId) {
+          const compteSuperieur = await axios.get(
+            `${API_BASE_URL}/comptes-utilisateurs/entity/${stageSelectionne.superieurHierarchiqueDocumentId}/type/SUPERIEUR_HIERARCHIQUE`
+          );
+
+          if (compteSuperieur.data) {
+            await axios.post(`${API_BASE_URL}/notifications/create`, {
+              titre: "Stage terminé",
+              message: `Le stage "${stageSelectionne.titre}" a été marqué comme terminé par l'encadreur.`,
+              type: "STAGE_TERMINE",
+              compteUtilisateurDocumentId: compteSuperieur.data.documentId,
+              documentIdReference: stageSelectionne.documentId,
+              typeReference: "STAGE"
+            });
+          }
+        }
+      } catch (notifError) {
+        console.error("Erreur création notification supérieur:", notifError);
+      }
+
+      // Mettre à jour le statut des stagiaires
+      try {
+        for (const stagiaireId of stageSelectionne.stagiairesDocumentIds) {
+          const stagiaire = stagiaires.find(s => s.documentId === stagiaireId);
+          if (stagiaire) {
+            // Vérifier si le stagiaire a d'autres stages actifs
+            const autresStagesActifs = await axios.get(`${API_BASE_URL}/stages/stagiaire/${stagiaireId}`);
+            const aAutresStages = autresStagesActifs.data.some(stage =>
+              stage.statutStage === 'EN_COURS' && stage.documentId !== stageSelectionne.documentId
+            );
+
+            if (!aAutresStages) {
+              // Désactiver le stagiaire s'il n'a plus de stages actifs
+              await axios.put(`${API_BASE_URL}/stagiaires/${stagiaireId}/desactiver`);
+
+              // Notification pour le stagiaire
+              const compteStagiaire = await axios.get(
+                `${API_BASE_URL}/comptes-utilisateurs/entity/${stagiaireId}/type/STAGIAIRE`
+              );
+
+              if (compteStagiaire.data) {
+                await axios.post(`${API_BASE_URL}/notifications/create`, {
+                  titre: "Statut mis à jour",
+                  message: `Votre statut a été mis à jour suite à la fin de votre stage.`,
+                  type: "MESSAGE_IMPORTANT",
+                  compteUtilisateurDocumentId: compteStagiaire.data.documentId,
+                  documentIdReference: stagiaireId,
+                  typeReference: "STAGIAIRE"
+                });
+              }
+            }
+          }
+        }
+      } catch (statutError) {
+        console.error("Erreur mise à jour statut stagiaires:", statutError);
+      }
+
+      toast.success("Stage terminé avec succès et notifications envoyées");
+      await fetchStages();
+      setIsTerminerDialogOpen(false);
+      setStageSelectionne(null);
+    } catch (error) {
+      console.error("Erreur lors de la finalisation du stage:", error);
+      toast.error("Erreur lors de la finalisation du stage");
+    }
   };
 
   const getStatutColor = (statutStage) => {
@@ -305,12 +444,12 @@ export default function EncadreurStage() {
   };
 
   const stagesFiltres = stages.filter(stage => {
-    const correspondRecherche = 
+    const correspondRecherche =
       stage.titre?.toLowerCase().includes(recherche.toLowerCase()) ||
       stage.description?.toLowerCase().includes(recherche.toLowerCase());
-    
+
     const correspondStatut = filtreStatut === "tous" || stage.statutStage === filtreStatut;
-    
+
     return correspondRecherche && correspondStatut;
   });
 
@@ -354,7 +493,7 @@ export default function EncadreurStage() {
       };
 
       const response = await axios.post(`${API_BASE_URL}/stages`, stageData);
-      
+
       // Créer une notification pour le supérieur hiérarchique
       if (superieurHierarchiqueId) {
         try {
@@ -362,10 +501,10 @@ export default function EncadreurStage() {
           const compteResponse = await axios.get(
             `${API_BASE_URL}/comptes-utilisateurs/entity/${superieurHierarchiqueId}/type/SUPERIEUR_HIERARCHIQUE`
           );
-          
+
           if (compteResponse.data) {
             const compteSuperieur = compteResponse.data;
-            
+
             await axios.post(`${API_BASE_URL}/notifications/create`, {
               titre: "Nouveau stage à valider",
               message: `L'encadreur ${user.email} a créé un nouveau stage "${stageData.titre}" nécessitant votre validation.`,
@@ -382,7 +521,7 @@ export default function EncadreurStage() {
 
       toast.success("Stage créé avec succès et envoyé pour validation");
       await fetchStages();
-      
+
       setNouveauStage({
         titre: "",
         description: "",
@@ -412,8 +551,8 @@ export default function EncadreurStage() {
       const tacheData = {
         titre: nouvelleTache.titre.trim(),
         description: nouvelleTache.description.trim(),
-        dateDebut: nouvelleTache.dateDebut + 'T09:00:00', // Ajouter l'heure
-        dateFin: nouvelleTache.dateFin + 'T17:00:00', // Ajouter l'heure
+        dateDebut: nouvelleTache.dateDebut + 'T09:00:00',
+        dateFin: nouvelleTache.dateFin + 'T17:00:00',
         statut: 'A_FAIRE',
         priorite: parseInt(nouvelleTache.priorite),
         stageDocumentId: stageSelectionne.documentId
@@ -429,10 +568,10 @@ export default function EncadreurStage() {
             const compteResponse = await axios.get(
               `${API_BASE_URL}/comptes-utilisateurs/entity/${stagiaireId}/type/STAGIAIRE`
             );
-            
+
             if (compteResponse.data) {
               const compteStagiaire = compteResponse.data;
-              
+
               await axios.post(`${API_BASE_URL}/notifications/create`, {
                 titre: "Nouvelle tâche assignée",
                 message: `Une nouvelle tâche "${tacheData.titre}" vous a été assignée pour le stage "${stageSelectionne.titre}".`,
@@ -449,8 +588,8 @@ export default function EncadreurStage() {
       }
 
       toast.success("Tâche créée avec succès et notifications envoyées aux stagiaires");
-      await fetchStages(); // Recharger pour avoir les nouvelles tâches
-      
+      await fetchStages();
+
       setNouvelleTache({
         titre: "",
         description: "",
@@ -471,17 +610,35 @@ export default function EncadreurStage() {
       toast.error("Vous ne pouvez ajouter des tâches qu'aux stages en cours");
       return;
     }
-    
+
     setStageSelectionne(stage);
     setNouvelleTache({
       titre: "",
       description: "",
-      dateDebut: stage.dateDebut, // Pré-remplir avec les dates du stage
+      dateDebut: stage.dateDebut,
       dateFin: stage.dateFin,
       priorite: 2
     });
     setValidationTacheErrors({});
     setIsTacheDialogOpen(true);
+  };
+
+  const handleOuvrirModalTerminer = (stage) => {
+    if (stage.statutStage !== 'EN_COURS') {
+      toast.error("Seuls les stages en cours peuvent être terminés");
+      return;
+    }
+
+    const aujourdhui = new Date();
+    const dateFinStage = new Date(stage.dateFin);
+
+    if (aujourdhui < dateFinStage) {
+      toast.error("Impossible de terminer le stage avant sa date de fin prévue");
+      return;
+    }
+
+    setStageSelectionne(stage);
+    setIsTerminerDialogOpen(true);
   };
 
   const handleSupprimerStage = async (stageId) => {
@@ -526,6 +683,7 @@ export default function EncadreurStage() {
     valides: stages.filter(s => s.statutStage === 'VALIDE').length,
     refuses: stages.filter(s => s.statutStage === 'REFUSE').length,
     enCours: stages.filter(s => s.statutStage === 'EN_COURS').length,
+    termines: stages.filter(s => s.statutStage === 'TERMINE').length,
     placesTotal: stages.reduce((acc, stage) => acc + (stage.places || 0), 0),
     placesRestantes: stages.reduce((acc, stage) => acc + (stage.placesRestantes || 0), 0),
     totalStagiaires: stages.reduce((acc, stage) => acc + (stage.nombreStagiaires || 0), 0),
@@ -544,14 +702,8 @@ export default function EncadreurStage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+    <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -565,10 +717,16 @@ export default function EncadreurStage() {
           },
         }}
       />
-
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
       {/* Header avec bouton d'ajout */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-        <motion.div 
+        <motion.div
           className="space-y-2"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -595,18 +753,18 @@ export default function EncadreurStage() {
                 Créer un Nouveau Stage
               </DialogTitle>
               <DialogDescription>
-                Remplissez les informations pour créer une nouvelle offre de stage. 
+                Remplissez les informations pour créer une nouvelle offre de stage.
                 Le stage devra être validé par votre supérieur hiérarchique.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="grid gap-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="titre">Titre du stage *</Label>
                 <Input
                   id="titre"
                   value={nouveauStage.titre}
-                  onChange={(e) => setNouveauStage({...nouveauStage, titre: e.target.value})}
+                  onChange={(e) => setNouveauStage({ ...nouveauStage, titre: e.target.value })}
                   placeholder="Ex: Stage Développement Web Fullstack"
                   className={validationErrors.titre ? "border-red-500" : ""}
                 />
@@ -620,7 +778,7 @@ export default function EncadreurStage() {
                 <Textarea
                   id="description"
                   value={nouveauStage.description}
-                  onChange={(e) => setNouveauStage({...nouveauStage, description: e.target.value})}
+                  onChange={(e) => setNouveauStage({ ...nouveauStage, description: e.target.value })}
                   placeholder="Décrivez les missions, objectifs et compétences visées..."
                   rows={4}
                   className={validationErrors.description ? "border-red-500" : ""}
@@ -637,7 +795,7 @@ export default function EncadreurStage() {
                     id="dateDebut"
                     type="date"
                     value={nouveauStage.dateDebut}
-                    onChange={(e) => setNouveauStage({...nouveauStage, dateDebut: e.target.value})}
+                    onChange={(e) => setNouveauStage({ ...nouveauStage, dateDebut: e.target.value })}
                     className={validationErrors.dateDebut ? "border-red-500" : ""}
                   />
                   {validationErrors.dateDebut && (
@@ -650,7 +808,7 @@ export default function EncadreurStage() {
                     id="dateFin"
                     type="date"
                     value={nouveauStage.dateFin}
-                    onChange={(e) => setNouveauStage({...nouveauStage, dateFin: e.target.value})}
+                    onChange={(e) => setNouveauStage({ ...nouveauStage, dateFin: e.target.value })}
                     className={validationErrors.dateFin ? "border-red-500" : ""}
                   />
                   {validationErrors.dateFin && (
@@ -667,7 +825,7 @@ export default function EncadreurStage() {
                   min="1"
                   max="10"
                   value={nouveauStage.places}
-                  onChange={(e) => setNouveauStage({...nouveauStage, places: e.target.value})}
+                  onChange={(e) => setNouveauStage({ ...nouveauStage, places: e.target.value })}
                   placeholder="Nombre de stagiaires maximum"
                   className={validationErrors.places ? "border-red-500" : ""}
                 />
@@ -679,7 +837,7 @@ export default function EncadreurStage() {
                 </p>
               </div>
             </div>
-            
+
             <DialogFooter>
               <Button variant="outline" onClick={() => {
                 setIsDialogOpen(false);
@@ -687,7 +845,7 @@ export default function EncadreurStage() {
               }}>
                 Annuler
               </Button>
-              <Button 
+              <Button
                 onClick={handleAjouterStage}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
               >
@@ -708,56 +866,28 @@ export default function EncadreurStage() {
         {[
           {
             title: "Total Stages",
-            icon: (
-              <motion.div
-                animate={{ y: [0, -8, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <BookOpen className="h-6 w-6 text-blue-600" />
-              </motion.div>
-            ),
+            icon: <BookOpen className="h-6 w-6 text-blue-600" />,
             count: stats.total,
             text: "Offres créées",
             gradient: "from-blue-500 to-blue-600"
           },
           {
             title: "En Cours",
-            icon: (
-              <motion.div
-                animate={{ y: [-8, 0, -8] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <Clock className="h-6 w-6 text-green-600" />
-              </motion.div>
-            ),
+            icon: <Clock className="h-6 w-6 text-green-600" />,
             count: stats.enCours,
             text: "Stages actifs",
             gradient: "from-green-500 to-green-600"
           },
           {
-            title: "Stagiaires Actifs",
-            icon: (
-              <motion.div
-                animate={{ y: [0, -8, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <Users className="h-6 w-6 text-purple-600" />
-              </motion.div>
-            ),
-            count: stats.totalStagiaires,
-            text: "Total assignés",
+            title: "Terminés",
+            icon: <CheckCircle className="h-6 w-6 text-purple-600" />,
+            count: stats.termines,
+            text: "Stages finalisés",
             gradient: "from-purple-500 to-purple-600"
           },
           {
             title: "Tâches Créées",
-            icon: (
-              <motion.div
-                animate={{ y: [-8, 0, -8] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <ListTodo className="h-6 w-6 text-orange-600" />
-              </motion.div>
-            ),
+            icon: <ListTodo className="h-6 w-6 text-orange-600" />,
             count: stats.totalTaches,
             text: "Tâches assignées",
             gradient: "from-orange-500 to-orange-600"
@@ -830,122 +960,60 @@ export default function EncadreurStage() {
         </Card>
       </motion.div>
 
-      {/* Modal pour ajouter une tâche */}
-      <Dialog open={isTacheDialogOpen} onOpenChange={setIsTacheDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-white/20 dark:border-gray-700/50">
+      {/* Modal pour terminer un stage */}
+      <Dialog open={isTerminerDialogOpen} onOpenChange={setIsTerminerDialogOpen}>
+        <DialogContent className="sm:max-w-[500px] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-white/20 dark:border-gray-700/50">
           <DialogHeader>
             <DialogTitle className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Ajouter une Tâche
+              Terminer le Stage
             </DialogTitle>
             <DialogDescription>
-              Créez une nouvelle tâche pour le stage "{stageSelectionne?.titre}".
-              Les stagiaires recevront une notification.
+              Confirmez la finalisation du stage "{stageSelectionne?.titre}".
             </DialogDescription>
           </DialogHeader>
-          
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="titreTache">Titre de la tâche *</Label>
-              <Input
-                id="titreTache"
-                value={nouvelleTache.titre}
-                onChange={(e) => setNouvelleTache({...nouvelleTache, titre: e.target.value})}
-                placeholder="Ex: Conception de la base de données"
-                className={validationTacheErrors.titre ? "border-red-500" : ""}
-              />
-              {validationTacheErrors.titre && (
-                <p className="text-red-500 text-sm">{validationTacheErrors.titre}</p>
-              )}
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="descriptionTache">Description détaillée *</Label>
-              <Textarea
-                id="descriptionTache"
-                value={nouvelleTache.description}
-                onChange={(e) => setNouvelleTache({...nouvelleTache, description: e.target.value})}
-                placeholder="Décrivez la tâche en détail..."
-                rows={3}
-                className={validationTacheErrors.description ? "border-red-500" : ""}
-              />
-              {validationTacheErrors.description && (
-                <p className="text-red-500 text-sm">{validationTacheErrors.description}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="dateDebutTache">Date de début *</Label>
-                <Input
-                  id="dateDebutTache"
-                  type="date"
-                  value={nouvelleTache.dateDebut}
-                  onChange={(e) => setNouvelleTache({...nouvelleTache, dateDebut: e.target.value})}
-                  min={stageSelectionne?.dateDebut}
-                  max={stageSelectionne?.dateFin}
-                  className={validationTacheErrors.dateDebut ? "border-red-500" : ""}
-                />
-                {validationTacheErrors.dateDebut && (
-                  <p className="text-red-500 text-sm">{validationTacheErrors.dateDebut}</p>
-                )}
+          <div className="space-y-4 py-4">
+            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
+              <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
+                <AlertCircle className="h-5 w-5" />
+                <span className="font-semibold">Attention</span>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="dateFinTache">Date de fin *</Label>
-                <Input
-                  id="dateFinTache"
-                  type="date"
-                  value={nouvelleTache.dateFin}
-                  onChange={(e) => setNouvelleTache({...nouvelleTache, dateFin: e.target.value})}
-                  min={stageSelectionne?.dateDebut}
-                  max={stageSelectionne?.dateFin}
-                  className={validationTacheErrors.dateFin ? "border-red-500" : ""}
-                />
-                {validationTacheErrors.dateFin && (
-                  <p className="text-red-500 text-sm">{validationTacheErrors.dateFin}</p>
-                )}
-              </div>
+              <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+                Cette action va :
+              </p>
+              <ul className="text-sm text-amber-600 dark:text-amber-400 mt-1 list-disc list-inside space-y-1">
+                <li>Marquer le stage comme terminé</li>
+                <li>Envoyer des notifications à tous les stagiaires</li>
+                <li>Envoyer une notification au supérieur hiérarchique</li>
+                <li>Désactiver les stagiaires qui n'ont plus de stages actifs</li>
+              </ul>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="prioriteTache">Priorité</Label>
-              <Select 
-                value={nouvelleTache.priorite.toString()} 
-                onValueChange={(value) => setNouvelleTache({...nouvelleTache, priorite: parseInt(value)})}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionnez une priorité" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="1">Haute</SelectItem>
-                  <SelectItem value="2">Moyenne</SelectItem>
-                  <SelectItem value="3">Basse</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Informations sur les dates du stage */}
             {stageSelectionne && (
               <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                 <p className="text-sm text-blue-700 dark:text-blue-300">
-                  <strong>Période du stage :</strong> {new Date(stageSelectionne.dateDebut).toLocaleDateString()} - {new Date(stageSelectionne.dateFin).toLocaleDateString()}
+                  <strong>Stage :</strong> {stageSelectionne.titre}
                 </p>
-                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                  Les dates de la tâche doivent être comprises dans cette période.
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>Date de fin :</strong> {new Date(stageSelectionne.dateFin).toLocaleDateString()}
+                </p>
+                <p className="text-sm text-blue-700 dark:text-blue-300">
+                  <strong>Stagiaires affectés :</strong> {stageSelectionne.nombreStagiaires}
                 </p>
               </div>
             )}
           </div>
-          
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsTacheDialogOpen(false)}>
+            <Button variant="outline" onClick={() => setIsTerminerDialogOpen(false)}>
               Annuler
             </Button>
-            <Button 
-              onClick={handleAjouterTache}
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 gap-2"
+            <Button
+              onClick={handleTerminerStage}
+              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 gap-2"
             >
-              <Bell className="h-4 w-4" />
-              Créer et Notifier
+              <CheckCircle className="h-4 w-4" />
+              Terminer le Stage
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1005,7 +1073,7 @@ export default function EncadreurStage() {
                           Stagiaires assignés
                         </span>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {stage.nombreStagiaires} / {stage.places} places
+                          {stage.nombreStagiaires}
                         </div>
                       </div>
                       <div className="text-right">
@@ -1025,7 +1093,7 @@ export default function EncadreurStage() {
                           Tâches récentes :
                         </div>
                         <div className="space-y-1 max-h-20 overflow-y-auto">
-                          {stage.taches.slice(0, 3).map((tache) => (
+                          {stage.taches.slice(0, 2).map((tache) => (
                             <div key={tache.documentId} className="flex items-center justify-between text-xs p-1">
                               <span className="truncate flex-1">{tache.titre}</span>
                               <Badge className={`text-xs ${getPrioriteColor(tache.priorite)} ml-2`}>
@@ -1033,9 +1101,9 @@ export default function EncadreurStage() {
                               </Badge>
                             </div>
                           ))}
-                          {stage.taches.length > 3 && (
+                          {stage.taches.length > 1 && (
                             <div className="text-xs text-gray-500 text-center">
-                              +{stage.taches.length - 3} autres tâches
+                              +{stage.taches.length - 2} autres tâches
                             </div>
                           )}
                         </div>
@@ -1045,16 +1113,6 @@ export default function EncadreurStage() {
 
                   {/* Actions */}
                   <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-gray-700/50">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => handleVoirDetails(stage)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Détails
-                    </Button>
-                    
                     {/* Bouton Ajouter Tâche - seulement pour les stages en cours */}
                     {stage.statutStage === 'EN_COURS' && (
                       <Button
@@ -1068,18 +1126,141 @@ export default function EncadreurStage() {
                         Tâche
                       </Button>
                     )}
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => handleModifier(stage)}
-                      title="Modifier"
-                      disabled={stage.statutStage === 'VALIDE' || stage.statutStage === 'EN_COURS'}
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    
+
+                    {/* Modal pour ajouter une tâche */}
+                    <Dialog open={isTacheDialogOpen} onOpenChange={setIsTacheDialogOpen}>
+                      <DialogContent className="sm:max-w-[600px] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-white/20 dark:border-gray-700/50">
+                        <DialogHeader>
+                          <DialogTitle className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                            Ajouter une Tâche
+                          </DialogTitle>
+                          <DialogDescription>
+                            Créez une nouvelle tâche pour le stage "{stageSelectionne?.titre}".
+                            Les stagiaires recevront une notification.
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        <div className="grid gap-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="titreTache">Titre de la tâche *</Label>
+                            <Input
+                              id="titreTache"
+                              value={nouvelleTache.titre}
+                              onChange={(e) => setNouvelleTache({ ...nouvelleTache, titre: e.target.value })}
+                              placeholder="Ex: Conception de la base de données"
+                              className={validationTacheErrors.titre ? "border-red-500" : ""}
+                            />
+                            {validationTacheErrors.titre && (
+                              <p className="text-red-500 text-sm">{validationTacheErrors.titre}</p>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="descriptionTache">Description détaillée *</Label>
+                            <Textarea
+                              id="descriptionTache"
+                              value={nouvelleTache.description}
+                              onChange={(e) => setNouvelleTache({ ...nouvelleTache, description: e.target.value })}
+                              placeholder="Décrivez la tâche en détail..."
+                              rows={3}
+                              className={validationTacheErrors.description ? "border-red-500" : ""}
+                            />
+                            {validationTacheErrors.description && (
+                              <p className="text-red-500 text-sm">{validationTacheErrors.description}</p>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="dateDebutTache">Date de début *</Label>
+                              <Input
+                                id="dateDebutTache"
+                                type="date"
+                                value={nouvelleTache.dateDebut}
+                                onChange={(e) => setNouvelleTache({ ...nouvelleTache, dateDebut: e.target.value })}
+                                min={stageSelectionne?.dateDebut}
+                                max={stageSelectionne?.dateFin}
+                                className={validationTacheErrors.dateDebut ? "border-red-500" : ""}
+                              />
+                              {validationTacheErrors.dateDebut && (
+                                <p className="text-red-500 text-sm">{validationTacheErrors.dateDebut}</p>
+                              )}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="dateFinTache">Date de fin *</Label>
+                              <Input
+                                id="dateFinTache"
+                                type="date"
+                                value={nouvelleTache.dateFin}
+                                onChange={(e) => setNouvelleTache({ ...nouvelleTache, dateFin: e.target.value })}
+                                min={stageSelectionne?.dateDebut}
+                                max={stageSelectionne?.dateFin}
+                                className={validationTacheErrors.dateFin ? "border-red-500" : ""}
+                              />
+                              {validationTacheErrors.dateFin && (
+                                <p className="text-red-500 text-sm">{validationTacheErrors.dateFin}</p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="prioriteTache">Priorité</Label>
+                            <Select
+                              value={nouvelleTache.priorite.toString()}
+                              onValueChange={(value) => setNouvelleTache({ ...nouvelleTache, priorite: parseInt(value) })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionnez une priorité" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">Haute</SelectItem>
+                                <SelectItem value="2">Moyenne</SelectItem>
+                                <SelectItem value="3">Basse</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Informations sur les dates du stage */}
+                          {stageSelectionne && (
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                              <p className="text-sm text-blue-700 dark:text-blue-300">
+                                <strong>Période du stage :</strong> {new Date(stageSelectionne.dateDebut).toLocaleDateString()} - {new Date(stageSelectionne.dateFin).toLocaleDateString()}
+                              </p>
+                              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                                Les dates de la tâche doivent être comprises dans cette période.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsTacheDialogOpen(false)}>
+                            Annuler
+                          </Button>
+                          <Button
+                            onClick={handleAjouterTache}
+                            className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 gap-2"
+                          >
+                            <Bell className="h-4 w-4" />
+                            Créer et Notifier
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                    {/* Bouton Terminer Stage - seulement pour les stages en cours après la date de fin */}
+                    {stage.statutStage === 'EN_COURS' && new Date() >= new Date(stage.dateFin) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2 border-emerald-300 dark:border-emerald-600 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
+                        onClick={() => handleOuvrirModalTerminer(stage)}
+                        title="Terminer le stage"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        Terminer
+                      </Button>
+                    )}
+
                     <Button
                       variant="outline"
                       size="sm"
@@ -1100,11 +1281,12 @@ export default function EncadreurStage() {
                       </p>
                     </div>
                   )}
-                  
+
                   {stage.statutStage === 'EN_COURS' && (
                     <div className="mt-3 p-2 bg-green-50 dark:bg-green-900/20 rounded-lg">
                       <p className="text-xs text-green-700 dark:text-green-300">
                         ✅ Stage en cours - Vous pouvez ajouter des tâches
+                        {new Date() >= new Date(stage.dateFin) && " - Prêt à être terminé"}
                       </p>
                     </div>
                   )}
@@ -1128,12 +1310,12 @@ export default function EncadreurStage() {
             {stages.length === 0 ? "Aucun stage créé" : "Aucun stage trouvé"}
           </h3>
           <p className="text-gray-400 dark:text-gray-500 mb-4">
-            {stages.length === 0 
-              ? "Commencez par créer votre premier stage." 
+            {stages.length === 0
+              ? "Commencez par créer votre premier stage."
               : "Aucun stage ne correspond à vos critères de recherche."
             }
           </p>
-          <Button 
+          <Button
             onClick={() => setIsDialogOpen(true)}
             className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
           >
@@ -1143,5 +1325,6 @@ export default function EncadreurStage() {
         </motion.div>
       )}
     </motion.div>
+    </>
   );
 }

@@ -108,7 +108,35 @@ export default function AdminSuperieur() {
   useEffect(() => {
     fetchSuperieurs();
   }, []);
+  // Ajoutez ces fonctions dans votre composant, après les useState
+const validateCIN = (cin) => {
+  const cleanCIN = cin.replace(/\s+/g, '');
+  
+  // Vérification basique
+  if (cleanCIN.length !== 12) return false;
+  if (!/^\d+$/.test(cleanCIN)) return false;
+  
+  const district = cleanCIN.substring(0, 3);
+  const partieCentrale = cleanCIN.substring(3, 6);
+  
+  const districtsValides = ['201', '101', '301', '401', '501', '601'];
+  if (!districtsValides.includes(district)) return false;
+  if (partieCentrale !== '010' && partieCentrale !== '011') return false;
+  
+  return true;
+};
 
+const validateTelephone = (telephone) => {
+  const cleanPhone = telephone.replace(/\s+/g, '');
+  
+  if (cleanPhone.length !== 10) return false;
+  if (!/^\d+$/.test(cleanPhone)) return false;
+  
+  const prefixesValides = ['033', '032', '034', '038', '037'];
+  const prefix = cleanPhone.substring(0, 3);
+  
+  return prefixesValides.includes(prefix);
+};
   // Vérifier si l'email existe déjà (vérification côté client)
   const checkEmailExists = (email, currentDocumentId = null) => {
     const superieurWithEmail = superieurs.find(s => s.email === email);
@@ -175,6 +203,19 @@ export default function AdminSuperieur() {
       toast.error("Veuillez remplir tous les champs obligatoires");
       return;
     }
+
+    // Validation CIN - SIMPLE
+    if (!validateCIN(formData.cin)) {
+      toast.error("CIN invalide : doit avoir 12 chiffres, commencer par 201/101/301/401/501/601, suivi de 010 ou 011");
+      return;
+    }
+
+    // Validation téléphone - SIMPLE
+    if (!validateTelephone(formData.telephone)) {
+      toast.error("Téléphone invalide : 10 chiffres commençant par 033, 032, 034, 038 ou 037");
+      return;
+    }
+
 
     let response;
     if (selectedSuperieur) {
@@ -311,14 +352,8 @@ export default function AdminSuperieur() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-       <Toaster 
+    <>
+    <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -332,6 +367,13 @@ export default function AdminSuperieur() {
           },
         }}
       />
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
       {/* Header */}
       <motion.div 
         className="space-y-2"
@@ -349,14 +391,6 @@ export default function AdminSuperieur() {
             </p>
           </div>
           <div className="flex gap-3">
-            <Button 
-              onClick={handleExport}
-              variant="outline"
-              className="gap-2 border-gray-300 dark:border-gray-600"
-            >
-              <Download className="h-4 w-4" />
-              Exporter
-            </Button>
             <Dialog open={openDialog} onOpenChange={setOpenDialog}>
               <DialogTrigger asChild>
                 <Button 
@@ -709,15 +743,6 @@ export default function AdminSuperieur() {
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(superieur)}
-                          title="Voir détails"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
 
                         <Button
                           variant="outline"
@@ -751,5 +776,6 @@ export default function AdminSuperieur() {
         </Card>
       </motion.div>
     </motion.div>
+    </>
   );
 }

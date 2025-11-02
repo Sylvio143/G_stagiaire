@@ -321,20 +321,6 @@ export default function StagiaireStage() {
       transition={{ type: "spring", stiffness: 100, damping: 10 }}
       className="min-h-screen p-6 space-y-8 bg-transparent"
     >
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 4000,
-          style: {
-            background: '#fff',
-            color: '#363636',
-            fontSize: '14px',
-            fontWeight: '500',
-            borderRadius: '10px',
-            padding: '12px 16px',
-          },
-        }}
-      />
 
       {/* Header */}
       <motion.div 
@@ -546,27 +532,8 @@ export default function StagiaireStage() {
                       <UserCheck className="h-4 w-4" />
                       <span>Encadré par {stage.encadreurNom}</span>
                     </div>
-
-                    {stage.joursRestants > 0 && stage.statutStage === 'EN_COURS' && (
-                      <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
-                        <Clock className="h-4 w-4" />
-                        <span>{stage.joursRestants} jours restants</span>
-                      </div>
-                    )}
                   </div>
 
-                  {/* Progression globale */}
-                  <div className="mb-4">
-                    <div className="flex justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Progression globale
-                      </span>
-                      <span className="text-sm font-semibold text-emerald-600">
-                        {stage.progression}%
-                      </span>
-                    </div>
-                    <CustomProgressBar value={stage.progression} />
-                  </div>
 
                   {/* Statistiques du stage */}
                   <div className="grid grid-cols-3 gap-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg mb-4">
@@ -596,18 +563,6 @@ export default function StagiaireStage() {
                     </div>
                   </div>
 
-                  {/* Compétences */}
-                  <div className="mb-4">
-                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Compétences développées</div>
-                    <div className="flex flex-wrap gap-1">
-                      {stage.competences.map((competence, index) => (
-                        <Badge key={index} variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                          {competence}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
                   {/* Description */}
                   <div className="mb-4">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">Description</div>
@@ -618,37 +573,7 @@ export default function StagiaireStage() {
 
                   {/* Actions */}
                   <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-gray-700/50">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => handleVoirDetails(stage)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Détails
-                    </Button>
-                    
-                    {stage.statutStage === 'EN_COURS' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="gap-2 border-emerald-300 dark:border-emerald-600 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                        onClick={() => handleSoumettreRapport(stage)}
-                        title="Soumettre rapport"
-                      >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                    )}
-                    
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2 border-blue-300 dark:border-blue-600 text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                      onClick={() => handleContacterEncadreur(stage)}
-                      title="Contacter l'encadreur"
-                    >
-                      <UserCheck className="h-4 w-4" />
-                    </Button>
+                  
                   </div>
                 </div>
               </Card>

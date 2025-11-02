@@ -577,7 +577,7 @@ const Login = () => {
                     <GraduationCap className="w-8 h-8 text-white" />
                   </motion.div>
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-800">StageManager Pro</h2>
+                    <h2 className="text-2xl font-bold text-gray-800">G-stagiaire</h2>
                     <p className="text-blue-600 font-semibold text-sm mt-1">Gestion de Stagiaires</p>
                   </div>
                 </div>
@@ -585,7 +585,7 @@ const Login = () => {
                 <motion.div className="space-y-3" variants={leftSectionVariants}>
                   {[
                     { text: "Suivi personnalisé des stagiaires", icon: Users },
-                    { text: "Évaluations et rapports détaillés", icon: Briefcase },
+                    { text: "Suivi des Stage", icon: Briefcase },
                     { text: "Interface professionnelle", icon: Clock }
                   ].map((feature, index) => (
                     <motion.div 
@@ -601,25 +601,6 @@ const Login = () => {
                     </motion.div>
                   ))}
                 </motion.div>
-              </motion.div>
-
-              {/* Statistiques compactes */}
-              <motion.div
-                className="grid grid-cols-3 gap-3"
-                variants={itemVariants}
-              >
-                <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 text-center shadow-lg border border-white/20">
-                  <div className="text-lg font-bold text-blue-600">500+</div>
-                  <div className="text-xs text-gray-600">Entreprises</div>
-                </div>
-                <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 text-center shadow-lg border border-white/20">
-                  <div className="text-lg font-bold text-purple-600">2K+</div>
-                  <div className="text-xs text-gray-600">Stagiaires</div>
-                </div>
-                <div className="bg-white/80 backdrop-blur-sm rounded-xl p-3 text-center shadow-lg border border-white/20">
-                  <div className="text-lg font-bold text-green-600">98%</div>
-                  <div className="text-xs text-gray-600">Satisfaction</div>
-                </div>
               </motion.div>
             </motion.div>
 
@@ -684,7 +665,7 @@ const Login = () => {
                       className="hidden xl:block"
                     >
                       <CardTitle className="text-2xl xl:text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        StageManager Pro
+                        G-stagiaire
                       </CardTitle>
                       <CardDescription className="text-gray-600 text-sm xl:text-base mt-2">
                         Accédez à votre espace professionnel
@@ -743,7 +724,7 @@ const Login = () => {
                                     id="email"
                                     name="email"
                                     type="email"
-                                    placeholder="admin@stage.mg"
+                                    placeholder="email"
                                     value={formData.email}
                                     onChange={handleInputChange}
                                     required

@@ -549,14 +549,8 @@ export default function EncadreurStagiaire() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+     <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -570,6 +564,13 @@ export default function EncadreurStagiaire() {
           },
         }}
       />
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
 
       {/* Header */}
       <motion.div 
@@ -586,184 +587,6 @@ export default function EncadreurStagiaire() {
             <p className="text-gray-600 dark:text-gray-400 text-lg">
               Gestion et suivi de vos stagiaires en cours
             </p>
-          </div>
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleExporterListe}
-              variant="outline"
-              className="gap-2 border-gray-300 dark:border-gray-600"
-            >
-              <Download className="h-4 w-4" />
-              Exporter
-            </Button>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gap-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                  <Plus className="h-4 w-4" />
-                  Nouveau Stagiaire
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[600px] bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border border-white/20 dark:border-gray-700/50">
-                <DialogHeader>
-                  <DialogTitle className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                    Ajouter un Nouveau Stagiaire
-                  </DialogTitle>
-                  <DialogDescription>
-                    Remplissez les informations pour ajouter un nouveau stagiaire à votre encadrement.
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="grid gap-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="nom">Nom *</Label>
-                      <Input
-                        id="nom"
-                        value={nouveauStagiaire.nom}
-                        onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, nom: e.target.value})}
-                        placeholder="Nom du stagiaire"
-                        className={validationErrors.nom ? "border-red-500" : ""}
-                      />
-                      {validationErrors.nom && (
-                        <p className="text-red-500 text-sm">{validationErrors.nom}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="prenom">Prénom *</Label>
-                      <Input
-                        id="prenom"
-                        value={nouveauStagiaire.prenom}
-                        onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, prenom: e.target.value})}
-                        placeholder="Prénom du stagiaire"
-                        className={validationErrors.prenom ? "border-red-500" : ""}
-                      />
-                      {validationErrors.prenom && (
-                        <p className="text-red-500 text-sm">{validationErrors.prenom}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email *</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={nouveauStagiaire.email}
-                        onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, email: e.target.value})}
-                        placeholder="email@exemple.com"
-                        className={validationErrors.email ? "border-red-500" : ""}
-                      />
-                      {validationErrors.email && (
-                        <p className="text-red-500 text-sm">{validationErrors.email}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="cin">CIN *</Label>
-                      <Input
-                        id="cin"
-                        value={nouveauStagiaire.cin}
-                        onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, cin: e.target.value})}
-                        placeholder="Numéro CIN"
-                        className={validationErrors.cin ? "border-red-500" : ""}
-                      />
-                      {validationErrors.cin && (
-                        <p className="text-red-500 text-sm">{validationErrors.cin}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="telephone">Téléphone</Label>
-                      <Input
-                        id="telephone"
-                        value={nouveauStagiaire.telephone}
-                        onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, telephone: e.target.value})}
-                        placeholder="+33 6 12 34 56 78"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="dateNaissance">Date de naissance</Label>
-                      <Input
-                        id="dateNaissance"
-                        type="date"
-                        value={nouveauStagiaire.dateNaissance}
-                        onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, dateNaissance: e.target.value})}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="ecole">École *</Label>
-                      <Input
-                        id="ecole"
-                        value={nouveauStagiaire.ecole}
-                        onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, ecole: e.target.value})}
-                        placeholder="Nom de l'école"
-                        className={validationErrors.ecole ? "border-red-500" : ""}
-                      />
-                      {validationErrors.ecole && (
-                        <p className="text-red-500 text-sm">{validationErrors.ecole}</p>
-                      )}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="filiere">Filière *</Label>
-                      <Input
-                        id="filiere"
-                        value={nouveauStagiaire.filiere}
-                        onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, filiere: e.target.value})}
-                        placeholder="Filière d'étude"
-                        className={validationErrors.filiere ? "border-red-500" : ""}
-                      />
-                      {validationErrors.filiere && (
-                        <p className="text-red-500 text-sm">{validationErrors.filiere}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="niveauEtude">Niveau d'étude *</Label>
-                    <Input
-                      id="niveauEtude"
-                      value={nouveauStagiaire.niveauEtude}
-                      onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, niveauEtude: e.target.value})}
-                      placeholder="Ex: Licence 3, Master 1..."
-                      className={validationErrors.niveauEtude ? "border-red-500" : ""}
-                    />
-                    {validationErrors.niveauEtude && (
-                      <p className="text-red-500 text-sm">{validationErrors.niveauEtude}</p>
-                    )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="adresse">Adresse</Label>
-                    <Input
-                      id="adresse"
-                      value={nouveauStagiaire.adresse}
-                      onChange={(e) => setNouveauStagiaire({...nouveauStagiaire, adresse: e.target.value})}
-                      placeholder="Adresse complète"
-                    />
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => {
-                    setIsDialogOpen(false);
-                    setValidationErrors({});
-                  }}>
-                    Annuler
-                  </Button>
-                  <Button 
-                    onClick={handleAjouterStagiaire}
-                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-                  >
-                    Ajouter le Stagiaire
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
           </div>
         </div>
       </motion.div>
@@ -1003,39 +826,21 @@ export default function EncadreurStagiaire() {
                   </div>
                 </div>
 
-                {/* Barre de progression du stage */}
-                {stagiaire.hasActiveStage && (
-                  <div className="px-6 pb-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Progression du stage</span>
-                      <span className="text-sm font-semibold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                        {stagiaire.progression}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <motion.div
-                        className={`h-2 rounded-full ${getProgressionColor(stagiaire.progression)}`}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${stagiaire.progression}%` }}
-                        transition={{ duration: 1, delay: 0.2 }}
-                      />
-                    </div>
-                  </div>
-                )}
-
                 {/* Actions */}
                 <div className="p-6 pt-4 border-t border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-700/30">
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => handleVoirDetails(stagiaire)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Voir
-                    </Button>
-                    
+                    {/* Bouton d'assignation de stage pour les stagiaires sans stage */}
+                  {!stagiaire.hasActiveStage && stagiaire.statut === 'ACTIF' && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 gap-2 border-blue-300 text-blue-600 hover:text-blue-700"
+                        onClick={() => handleOuvrirAssignation(stagiaire)}
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        Assigner un stage
+                      </Button>    
+                  )}            
                     <Button
                       variant="outline"
                       size="sm"
@@ -1061,20 +866,7 @@ export default function EncadreurStagiaire() {
                     </Button>
                   </div>
 
-                  {/* Bouton d'assignation de stage pour les stagiaires sans stage */}
-                  {!stagiaire.hasActiveStage && stagiaire.statut === 'ACTIF' && (
-                    <div className="mt-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full gap-2 border-blue-300 text-blue-600 hover:text-blue-700"
-                        onClick={() => handleOuvrirAssignation(stagiaire)}
-                      >
-                        <BookOpen className="h-4 w-4" />
-                        Assigner un stage
-                      </Button>
-                    </div>
-                  )}
+                  
                 </div>
               </Card>
             </motion.div>
@@ -1172,5 +964,6 @@ export default function EncadreurStagiaire() {
         </motion.div>
       )}
     </motion.div>
+    </>
   );
 }

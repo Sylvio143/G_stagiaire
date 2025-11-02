@@ -366,14 +366,8 @@ export default function StagiaireTache() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+    <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -387,6 +381,14 @@ export default function StagiaireTache() {
           },
         }}
       />
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
+      
 
       {/* Header */}
       <motion.div 
@@ -659,26 +661,8 @@ export default function StagiaireTache() {
                           <span>Début: {new Date(tache.dateDebut).toLocaleDateString()}</span>
                         </div>
                       )}
-                      {tache.tempsEstime && (
-                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-                          <Clock className="h-4 w-4" />
-                          <span>Temps estimé: {tache.tempsEstime}</span>
-                        </div>
-                      )}
                     </div>
                     
-                    <div>
-                      <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                        Compétences
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {tache.competences.map((competence, index) => (
-                          <Badge key={index} variant="outline" className="text-xs bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300">
-                            {competence}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
                   </div>
 
                   {/* Actions */}
@@ -747,5 +731,6 @@ export default function StagiaireTache() {
         </motion.div>
       )}
     </motion.div>
+    </>
   );
 }

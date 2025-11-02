@@ -334,14 +334,8 @@ export default function SuperieurStage() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, x: 80 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 80 }}
-      transition={{ type: "spring", stiffness: 100, damping: 10 }}
-      className="min-h-screen p-6 space-y-8 bg-transparent"
-    >
-      <Toaster 
+    <>
+     <Toaster 
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -355,6 +349,14 @@ export default function SuperieurStage() {
           },
         }}
       />
+    <motion.div
+      initial={{ opacity: 0, x: 80 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: 80 }}
+      transition={{ type: "spring", stiffness: 100, damping: 10 }}
+      className="min-h-screen p-6 space-y-8 bg-transparent"
+    >
+     
 
       {/* Header */}
       <motion.div 
@@ -372,14 +374,6 @@ export default function SuperieurStage() {
               Gestion et validation des stages proposés par les encadreurs
             </p>
           </div>
-          <Button 
-            onClick={handleExporterRapport}
-            variant="outline"
-            className="gap-2 border-gray-300 dark:border-gray-600"
-          >
-            <Download className="h-4 w-4" />
-            Exporter
-          </Button>
         </div>
       </motion.div>
 
@@ -415,7 +409,7 @@ export default function SuperieurStage() {
                 <CheckCircle className="h-6 w-6 text-emerald-600" />
               </motion.div>
             ),
-            count: stats.valides,
+            count: stats.valides || stats.enCours,
             text: "Approuvés et actifs",
             gradient: "from-emerald-500 to-emerald-600"
           },
@@ -597,7 +591,7 @@ export default function SuperieurStage() {
                           Stagiaires assignés
                         </span>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {stage.nombreStagiaires} / {stage.places} places
+                          {stage.nombreStagiaires} stagiaire
                         </div>
                       </div>
                       <div className="text-right">
@@ -613,15 +607,6 @@ export default function SuperieurStage() {
 
                   {/* Actions selon le statut */}
                   <div className="flex gap-2 pt-4 border-t border-gray-100 dark:border-gray-700/50">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 gap-2 border-gray-300 dark:border-gray-600"
-                      onClick={() => handleVoirDetails(stage)}
-                    >
-                      <Eye className="h-4 w-4" />
-                      Détails
-                    </Button>
                     
                     {stage.statutStage === 'EN_ATTENTE_VALIDATION' && (
                       <>
@@ -723,5 +708,6 @@ export default function SuperieurStage() {
         </div>
       )}
     </motion.div>
+    </>
   );
 }

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import axios from "axios";
+import { motion } from "framer-motion";
 
 export default function StagiaireSidebar({
   collapsed,
